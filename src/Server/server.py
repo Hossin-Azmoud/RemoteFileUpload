@@ -2,10 +2,33 @@ import socket
 from threading import Thread, active_count
 from dataclasses import dataclass, field
 from json import dumps, loads
+from base64 import b64decode
 from hashlib import sha256
-Server_Key = sha256("01234567".encode()).hexdigest()
+from .Auth import ConstructAuthManager
 
-def CheckPassword(P: str): return (Server_Key == sha256(P.encode()).hexdigest())
+UnitMap = {
+	'B': 1024 ** 0,
+	'KB': 1024 ** 1,
+	'MB': 1024 ** 2,
+	'GB': 1024 ** 3
+}
+
+def GetSizeInProperUnit(ByteLen: int) -> str:
+	Unit = 'B'
+
+	if ByteLen < UnitMap['KB']:
+		Unit = 'B'
+
+	if UnitMap['KB'] <= ByteLen < UnitMap['MB']:
+		Unit = 'KB'
+
+	if UnitMap['MB'] <= ByteLen < UnitMap['GB']:
+		Unit = 'MB'
+
+	if ByteLen >= UnitMap['GB']:
+		Unit = 'GB'
+
+	return f'{ ByteLen / UnitMap[Unit] } { Unit }'
 
 @dataclass
 class ServerResponse:
@@ -17,15 +40,14 @@ class ServerResponse:
 	
 def Ok(T: str = "OK"): 
 	return ServerResponse(200, T).JSON()
+
 def Error(T: str = "FAILED"): 
 	return ServerResponse(404, T).JSON()
 
 def DecodeClientMessage(ClientMessage: str):
 	New = loads(ClientMessage)
-	if ("fn" in New) and ("length" in New) and ("pwd" in New): 
-		
-		return New["fn"], New["length"], New["pwd"]
-	return False	
+	if ("fn" in New) and ("length" in New) and ("pwd" in New): return New["fn"], New["length"], New["pwd"]
+	return False
 
 @dataclass
 class server:
@@ -37,47 +59,64 @@ class server:
 	FORMAT: str = "utf-8"
 	DISCONNECTING: str = "!DISCONNECT"
 
-	def connect(self, conn, address):
-		print(f"NEW CONNECTION: { address }")
-		
+	def SetConfigInstance(self, I):
+		self.AuthManager = ConstructAuthManager(I)
+	
+	def SetHost(self, host): 
+		self.SERVER = host
+
+
+	def connect(self, conn, clientInfo):
+		address, port = clientInfo
 		connected = True
 		
 		while connected:
 			
 			FileHeaderLength = conn.recv(self.HEADER).decode(self.FORMAT)
-
+			
 			if FileHeaderLength:
 				ParsedLen = int(FileHeaderLength.strip())
-				
+								
 				if ParsedLen > 0:
 					Data_ = conn.recv(ParsedLen).decode(self.FORMAT)
 					ClientMsg = DecodeClientMessage(Data_)
 				
 					if ClientMsg:
 						fn, length, pwd = ClientMsg
-
-						if CheckPassword(pwd):
-
-
+						if self.AuthManager.CheckPassword(pwd):
+							
+							print("Receiving content from (", address, ")")
+							print("File Name: ", fn)
+							print("content-length: ", GetSizeInProperUnit(length))
+							
+							# print("Re")
 							Filebytes = conn.recv(length)
-						
+							
 							with open(fn, "wb") as f:
-								print(f"To disk -> {fn}!")
-								f.write(Filebytes)
+								print(f" -> {fn}!")
+								f.write(b64decode(Filebytes))
 
 							self.send(conn, Ok())
+							connected = False
 						else:
+
 							self.send(conn, Error("Wrong password!"))	
+							connected = False
 						
 					else:
 						self.send(conn, Error(f"""
 							Invalid header msg, should be: pwd: ..., fn: ..., length: ...
 							Instead received keys: { Data_ }
 						"""))
+						connected = False
 				else:
 					self.send(conn, Error("Empty dataFrame!"))
+					connected = False
 			else:
-				self.send(conn, Error("Sent empty header!"))
+				try:
+					self.send(conn, Error("Sent empty header!"))
+				except:
+					pass
 
 	def send(self, Conn, msg):
 		
@@ -99,8 +138,8 @@ class server:
 			print(f"Server Started {self.SERVER}:{self.PORT}")
 
 			while True:
-				conn, address = Sock.accept()
-				Thread_ = Thread(target=self.connect, args=(conn, address))
+				conn, clientInfo = Sock.accept()
+				Thread_ = Thread(target=self.connect, args=(conn, clientInfo))
 				Thread_.start()
 
 
@@ -109,4 +148,3 @@ class server:
 
 	def close(self):
 		self.SOCKET.close()
- 

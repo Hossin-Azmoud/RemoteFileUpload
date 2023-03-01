@@ -3,7 +3,7 @@ from threading import Thread
 from sys import argv
 from Server import server
 from Client import Client
-
+from Config import RFUConfig
 argv = argv[1:]
 argc = len(argv)
 SERVER: str = "-s"
@@ -11,6 +11,13 @@ CLIENT: str = "-c"
 
 def ServerRoute():
 	s = server()
+	# Takes care of auth and managing paths.
+	s.SetConfigInstance(RFUConfig())
+	
+	if argc > 1:
+		# In my phone I needed to manually setup the host. because it just keeps on serving in localhost...
+		s.SetHost(argv[1])
+
 	s.Listen()
 
 def ClientRoute():
@@ -29,8 +36,6 @@ progs = {
 def main():
 	if argc > 0:
 		if argv[0] in progs: progs[argv[0]]()
-
-
 
 if __name__ == '__main__': 
 	main()
