@@ -16,6 +16,9 @@ class Client:
 	def SetHost(self, host):
 		self.SERVER = host
 
+	def SetPort(self, NewPort):
+		self.PORT = NewPort
+
 	def setPassword(self):
 		p = input(f"Type in password to connect to ({self.SERVER}) :")
 		self.pwd = p
@@ -35,16 +38,14 @@ class Client:
 
 		MessageLengthAsInt = len(msg)	
 		if  len(str(MessageLengthAsInt)) <= self.HEADER:
-			
 			padding = " " * (self.HEADER - len(str(MessageLengthAsInt)))
 			self.SOCKET.send((str(MessageLengthAsInt) + padding).encode(self.FORMAT))
-			print("sent ->", str(MessageLengthAsInt) + padding, '|')
 			self.SOCKET.send(msg.encode(self.FORMAT))
 			return
 
 		print("Header is too small for msg!")
 
-	def SendDirect(self, bytes_): 
+	def SendDirect(self, bytes_):
 		self.SOCKET.send(bytes_)
 		self.HoldForResult()
 
@@ -67,8 +68,10 @@ class Client:
 				Data_ = self.SOCKET.recv(ParsedLen).decode(self.FORMAT)
 				LoadedResult = loads(Data_)
 				if LoadedResult["code"] == 200:
+					print()
 					print("Success")
 					print(LoadedResult["text"])
 				else:
+					print()
 					print("Failed! an error accured.")
 					print(LoadedResult["text"])

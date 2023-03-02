@@ -5,8 +5,7 @@ from json import dump, load
 from os import path
 
 # TODO: Make config class to load and dump config.
-class Auth:
-	
+class Auth:	
 	def __init__(self, ConfigClassInstance):
 		self.provider = ConfigClassInstance
 
@@ -23,5 +22,4 @@ class Auth:
 	def GenericHash(self, s):
 		return sha256(s.encode()).hexdigest()
 
-def ConstructAuthManager(ConfigInstance) -> Auth:
-	return Auth(ConfigInstance)
+def ConstructAuthManager(ConfigInstance) -> Auth: return Auth(ConfigInstance)

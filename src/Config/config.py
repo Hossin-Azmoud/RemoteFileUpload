@@ -12,8 +12,12 @@ class RFUConfig:
 		
 		if not (self.LoadConfig()):
 			self.AddConfig()
-
-	def GetValueByKey(self, k): return self.ConfigObject["pwd"]
+	@property
+	def SavePath(self): return self.ConfigObject["save_path"]
+	def joinWithSavePath(self, o): 
+		return path.join(self.SavePath, o)
+	
+	def GetValueByKey(self, k): return self.ConfigObject[k]
 	def SetValue(self, k, v):
 		self.LoadConfig()
 		if (k and v): 

@@ -5,6 +5,7 @@ from json import dumps, loads
 from base64 import b64decode
 from hashlib import sha256
 from .Auth import ConstructAuthManager
+from datetime import datetime
 
 UnitMap = {
 	'B': 1024 ** 0,
@@ -59,11 +60,32 @@ class server:
 	FORMAT: str = "utf-8"
 	DISCONNECTING: str = "!DISCONNECT"
 
-	def SetConfigInstance(self, I):
-		self.AuthManager = ConstructAuthManager(I)
+	def SetConfigInstance(self, configClass):
+		self.AuthManager = ConstructAuthManager(configClass)
+		self.configClass = configClass
 	
 	def SetHost(self, host): 
 		self.SERVER = host
+
+	def SetPort(self, NewPort):
+		self.PORT = NewPort
+
+
+	def recvFileBlob(self, Conn, address, length, fn):
+
+		print()
+		print("Receiving content from (", address, ")")
+		print("File Name: ", fn)
+		print("content-length: ", GetSizeInProperUnit(length))
+		
+		Filebytes = Conn.recv(length)
+		
+		with open(self.configClass.joinWithSavePath(fn), "wb") as f:
+
+			print(f" { fn } -> { self.configClass.joinWithSavePath(fn) } ")
+			f.write(b64decode(Filebytes))
+
+		self.send(Conn, Ok())
 
 
 	def connect(self, conn, clientInfo):
@@ -84,22 +106,9 @@ class server:
 					if ClientMsg:
 						fn, length, pwd = ClientMsg
 						if self.AuthManager.CheckPassword(pwd):
-							
-							print("Receiving content from (", address, ")")
-							print("File Name: ", fn)
-							print("content-length: ", GetSizeInProperUnit(length))
-							
-							# print("Re")
-							Filebytes = conn.recv(length)
-							
-							with open(fn, "wb") as f:
-								print(f" -> {fn}!")
-								f.write(b64decode(Filebytes))
-
-							self.send(conn, Ok())
+							self.recvFileBlob(conn, address, length, fn)					
 							connected = False
 						else:
-
 							self.send(conn, Error("Wrong password!"))	
 							connected = False
 						
