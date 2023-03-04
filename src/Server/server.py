@@ -6,7 +6,7 @@ from base64 import b64decode
 from hashlib import sha256
 from .Auth import ConstructAuthManager
 from datetime import datetime
-
+from os import path
 UnitMap = {
 	'B': 1024 ** 0,
 	'KB': 1024 ** 1,
@@ -47,12 +47,21 @@ def Error(T: str = "FAILED"):
 
 def DecodeClientMessage(ClientMessage: str):
 	New = loads(ClientMessage)
-	if ("fn" in New) and ("length" in New) and ("pwd" in New): return New["fn"], New["length"], New["pwd"]
+
+	if ("fn" in New) and ("length" in New) and ("pwd" in New): 
+		return (
+			New["fn"], 
+			New["length"], 
+			New["pwd"], 
+			"buf" in New
+		)
+
 	return False
 
 @dataclass
 class server:
 	# clients: list = field(default_factory=list)
+	
 	PORT: int = 4000
 	SERVER: str = socket.gethostbyname(socket.gethostname())
 	SOCKET: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -70,6 +79,26 @@ class server:
 	def SetPort(self, NewPort):
 		self.PORT = NewPort
 
+	def RecvChunks(self, Conn, address, length, fn):
+		
+		recv_byte_len = 0
+		initializedFile = False
+		tmp_buffer = b''
+
+		while (recv_byte_len < length):
+			
+			print(f"RECV: { recv_byte_len } | ALL: { length }", end="\r")
+			ChunkSize = int(Conn.recv(self.HEADER).decode(self.FORMAT).strip())
+			tmp_buffer += Conn.recv(ChunkSize)
+			recv_byte_len += ChunkSize
+
+		self.DumpBytes(fn, tmp_buffer)
+		self.send(Conn, Ok())
+
+	def DumpBytes(self, fn, bytes_, mode='wb'):
+		with open(self.configClass.joinWithSavePath(fn), mode) as f:
+			print(f" { fn } -> { self.configClass.joinWithSavePath(fn) } ")
+			f.write(b64decode(bytes_))
 
 	def recvFileBlob(self, Conn, address, length, fn):
 
@@ -79,13 +108,10 @@ class server:
 		print("content-length: ", GetSizeInProperUnit(length))
 		
 		Filebytes = Conn.recv(length)
-		
-		with open(self.configClass.joinWithSavePath(fn), "wb") as f:
-
-			print(f" { fn } -> { self.configClass.joinWithSavePath(fn) } ")
-			f.write(b64decode(Filebytes))
-
+		self.DumpBytes(fn, Filebytes)
 		self.send(Conn, Ok())
+
+
 
 
 	def connect(self, conn, clientInfo):
@@ -104,10 +130,16 @@ class server:
 					ClientMsg = DecodeClientMessage(Data_)
 				
 					if ClientMsg:
-						fn, length, pwd = ClientMsg
+						fn, length, pwd, buf = ClientMsg
+
 						if self.AuthManager.CheckPassword(pwd):
-							self.recvFileBlob(conn, address, length, fn)					
-							connected = False
+							if not buf:
+								self.recvFileBlob(conn, address, length, fn)
+								connected = False
+							else:
+								# TODO: Make buffreceiver. for chunked data.
+								self.RecvChunks(conn, address, length, fn)
+								connected = False
 						else:
 							self.send(conn, Error("Wrong password!"))	
 							connected = False

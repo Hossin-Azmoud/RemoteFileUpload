@@ -14,7 +14,7 @@ A Socket based file sharing program. if you know the password you can dump data 
 ```
 - Now after activating the env, you can execute the script as server using -s or as a client by -c but if it is a client instance u need to specify the host.
 
-```bash
-	$ python main.py -s (Listen in port 4000)
-	$ python main.py -c <host> <fileName to send to server instance>
+```
+	$ python main.py -s --host <host> -p <port> (Listen in port 4000 by default.)
+	$ python main.py -c --host <host> -p <port> -f <filepath> --chunked <feature still not quiet usefull, since it is slow>
 ```

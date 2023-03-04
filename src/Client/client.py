@@ -45,19 +45,48 @@ class Client:
 
 		print("Header is too small for msg!")
 
-	def SendDirect(self, bytes_):
-		self.SOCKET.send(bytes_)
+	def SendFileBytes(self, FileBlobObject):
+		if not FileBlobObject.chunked:
+			self.SOCKET.send(FileBlobObject.bytes)
+			self.HoldForResult()
+			return
+
+		self.SendFileBuffered(FileBlobObject)
 		self.HoldForResult()
 
 	def close(self):
 		self.SOCKET.close()
 	
-	def SendFile(self, fn):
-		""" {  } """
-		with open(fn, "rb") as fp:
-			FileBlobObject = FileBlob(fp)
-			FileBlobObject.SendHeader(self)
-			FileBlobObject.SendBytes(self.SendDirect)
+	def SendFile(self, fn, chunked_flag=False):
+		FileBlobObject = FileBlob(fn, chunked = chunked_flag)
+		self.send(FileBlobObject.FileInformationHeader(self.pwd))
+		self.SendFileBytes(FileBlobObject)
+		return
+
+
+	def sendFileChunk(self, chunk: bytes, size: int):
+		padding = " " * (self.HEADER - len(str(size)))
+		self.SOCKET.send((str(size) + padding).encode(self.FORMAT))
+		self.SOCKET.send(chunk)
+
+	def SendFileBuffered(self, FileBlobObject):
+		
+		CHUNK_SIZE = 1024
+		
+		remains = (FileBlobObject.size % CHUNK_SIZE)
+		Tail = FileBlobObject.size - remains
+		Head = 0
+
+		# assert (ReachableBytesIndex == size - 100), "The formula for last reachable byte is incorrect."
+		while Head + CHUNK_SIZE < Tail:
+			
+			self.sendFileChunk(FileBlobObject.bytes[Head : (Head + CHUNK_SIZE)], CHUNK_SIZE)
+			Head += CHUNK_SIZE
+
+		if remains > 0:
+			self.sendFileChunk(FileBlobObject.bytes[Head : Head + remains], remains)
+		
+
 
 	def HoldForResult(self):
 		Length_ = self.SOCKET.recv(self.HEADER).decode(self.FORMAT)
@@ -75,3 +104,42 @@ class Client:
 					print()
 					print("Failed! an error accured.")
 					print(LoadedResult["text"])
+
+
+
+
+def sendBufferdProtoType():
+		CHUNK_SIZE = 1024
+		size = 1024 * 10
+		
+		Filebytes = ''.join(
+			[chr(randint(0, 256)) for i in range(size)]
+		).encode()
+
+		print(size, " bytes Was generated!")
+		print("Buffering...")
+
+		BuffStream = []
+		ReachableBytesIndex = size - (size % CHUNK_SIZE)
+		index = 0
+		# assert (ReachableBytesIndex == size - 100), "The formula for last reachable byte is incorrect."
+		
+		print("Remaining bytes ->", size % CHUNK_SIZE)
+		print("Last reachable ->", size - size % CHUNK_SIZE)
+
+
+		while index + CHUNK_SIZE < ReachableBytesIndex:
+			print(f"{ index  } : { index + CHUNK_SIZE}", end="\r")
+			BuffStream.append(Filebytes[index : (index + CHUNK_SIZE)])
+			index += CHUNK_SIZE
+		
+
+		print("Adding Remaining bytes:")
+		
+
+		BuffStream.append(Filebytes[index : index + (size % CHUNK_SIZE)])
+		
+		for chunk in BuffStream:
+			# Send to the server.
+			send(len(chunk))
+			send(chunk)

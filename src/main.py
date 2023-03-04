@@ -5,10 +5,11 @@ from Server import server
 from Client import Client
 from Config import RFUConfig
 import datetime
-
+from random import randint
 # stripping the name of the program.
+from time import sleep
 
-PORT_FLAG, HOST_FLAG, FILE_FLAG = '-p', '--host', '-f'
+PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG = '-p', '--host', '-f', '--chunked'
 argv = argv[1:]
 argc = len(argv)
 
@@ -32,13 +33,11 @@ SERVER: str = "-s"
 CLIENT: str = "-c"
 
 def Settings(InstanceClass: server | Client, arg: dict):
-
 	if HOST_FLAG in arg:
 		InstanceClass.SetHost(arg[HOST_FLAG])
 	
 	if PORT_FLAG in arg:
 		InstanceClass.SetPort(int(arg[PORT_FLAG]))
-
 
 def ServerRoute(arg):
 	s = server()
@@ -46,6 +45,7 @@ def ServerRoute(arg):
 	s.SetConfigInstance(RFUConfig())
 	Settings(s, arg)
 	s.Listen()
+
 
 def ClientRoute(arg):
 	c = Client()
@@ -55,7 +55,8 @@ def ClientRoute(arg):
 	c.connect()
 	
 	if FILE_FLAG in arg:
-		c.SendFile(arg[FILE_FLAG])
+		
+		c.SendFile(arg[FILE_FLAG], chunked_flag=(CHUNKED_FLAG in argv))
 	else:
 		print("File was not specified:")
 		print("How to: ")
@@ -71,15 +72,17 @@ progs = {
 def main():
 
 	arguments = parseArgs(argv[1:], argc - 1)
-	print(arguments)
+	# print(arguments)
+
 	if argc > 0:
 		if argv[0] in progs: 
 			progs[argv[0]](arguments)
 	else:		
 		print()
 		print("Remote share command line app.")
-		print("USAGE: main.py [-s/-c] -p [default: 4000] --host [default: current Host] -f <filePath>")
+		print("USAGE: main.py [-s/-c] -p [default: 4000] --host [default: current Host] -f <filePath> --chunked")
 		print("-f used only by the client to send data.")
+		print("--chunked for breaking down larger files.")
 
 if __name__ == '__main__': 
 	main()
