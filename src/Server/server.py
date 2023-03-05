@@ -7,12 +7,22 @@ from hashlib import sha256
 from .Auth import ConstructAuthManager
 from datetime import datetime
 from os import path
+
+# Size units.
 UnitMap = {
 	'B': 1024 ** 0,
 	'KB': 1024 ** 1,
 	'MB': 1024 ** 2,
 	'GB': 1024 ** 3
 }
+# https://www.youtube.com/watch?v=p6xqKJqsQWs -> LISTEN WHILE CODING.
+# My enums and constants.
+OK = 200
+OK_TEXT = "OK"
+NOT_OK = 404
+NOT_OK_TEXT = "FAILED"
+SERVER_ERR = 500
+SERVER_ERR_TEXT = "Unexpected error from socket server."
 
 def GetSizeInProperUnit(ByteLen: int) -> str:
 	Unit = 'B'
@@ -38,12 +48,7 @@ class ServerResponse:
 
 	def __dict__(self): return {"code": self.code, "text": self.text}
 	def JSON(self): return dumps(self.__dict__())
-	
-def Ok(T: str = "OK"): 
-	return ServerResponse(200, T).JSON()
 
-def Error(T: str = "FAILED"): 
-	return ServerResponse(404, T).JSON()
 
 def DecodeClientMessage(ClientMessage: str):
 	New = loads(ClientMessage)
@@ -56,12 +61,14 @@ def DecodeClientMessage(ClientMessage: str):
 			"buf" in New
 		)
 
+	if ("Folder" in New) and ("length" in New) and ("pwd" in New):
+		return New["Folder"], New["length"], New["pwd"]
+
 	return False
 
 @dataclass
 class server:
-	# clients: list = field(default_factory=list)
-	
+	clients: list = field(default_factory=list)
 	PORT: int = 4000
 	SERVER: str = socket.gethostbyname(socket.gethostname())
 	SOCKET: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -88,33 +95,57 @@ class server:
 		tmp_buffer = b''
 
 		while (recv_byte_len < length):
-			
-			print(f"RECV: { recv_byte_len } | ALL: { length }", end="\r")
+
 			ChunkSize = int(Conn.recv(self.HEADER).decode(self.FORMAT).strip())
 			tmp_buffer += Conn.recv(ChunkSize)
 			recv_byte_len += ChunkSize
 
 		self.DumpBytes(fn, tmp_buffer)
-		self.send(Conn, Ok())
+		self.OK(Conn)
 
-	def DumpBytes(self, fn, bytes_, mode='wb'):
-		with open(self.configClass.joinWithSavePath(fn), mode) as f:
-			print(f" { fn } -> { self.configClass.joinWithSavePath(fn) } ")
+	def OK(self, Conn): self.sendResult(Conn, OK)
+	def Error(self, Conn): self.sendResult(Conn, NOT_OK)
+
+	def DumpBytes(self, fn, bytes_, size_repr, mode='wb'):
+		print(f"{ size_repr } was received !")
+		
+		with open(self.configClass.joinWithSavePath(fn), mode) as f: 
 			f.write(b64decode(bytes_))
 
+		print("[DONE]")
+
 	def recvFileBlob(self, Conn, address, length, fn):
-
-		print()
-		print("Receiving content from (", address, ")")
-		print("File Name: ", fn)
-		print("content-length: ", GetSizeInProperUnit(length))
-		
+		print(f"{ address }:{fn} -> ./RFUFiles/{ fn }")
 		Filebytes = Conn.recv(length)
-		self.DumpBytes(fn, Filebytes)
-		self.send(Conn, Ok())
+		self.DumpBytes(fn, Filebytes, GetSizeInProperUnit(length))
+		self.OK(Conn)
 
 
+	def sendResult(self, Conn, Code, Text=None):
+		
+		if Code == OK:
+			self.send(Conn, 
+				ServerResponse(
+					code=OK, 
+					text=(lambda : OK_TEXT if not Text else Text)()
+				).JSON()
+			)
 
+		elif Code == NOT_OK:
+			self.send(Conn, 
+				ServerResponse(
+					code=NOT_OK, 
+					text=(lambda : NOT_OK_TEXT if not Text else Text)()
+				).JSON()
+			)
+		
+		else:
+			self.send(Conn, 
+				ServerResponse(
+					code=SERVER_ERR, 
+					text=SERVER_ERR_TEXT
+				).JSON()
+			)
 
 	def connect(self, conn, clientInfo):
 		address, port = clientInfo
@@ -143,21 +174,22 @@ class server:
 								self.RecvChunks(conn, address, length, fn)
 								connected = False
 						else:
-							self.send(conn, Error("Wrong password!"))	
+							self.sendResult(conn, NOT_OK, "Wrong password!")
 							connected = False
-						
 					else:
-						self.send(conn, Error(f"""
+						
+						self.sendResult(conn, NOT_OK, f"""
 							Invalid header msg, should be: pwd: ..., fn: ..., length: ...
 							Instead received keys: { Data_ }
-						"""))
+						""")
+						
 						connected = False
 				else:
-					self.send(conn, Error("Empty dataFrame!"))
+					self.sendResult(conn, NOT_OK, "Empty dataFrame!")
 					connected = False
 			else:
 				try:
-					self.send(conn, Error("Sent empty header!"))
+					self.sendResult(conn, NOT_OK, "Sent empty header!")
 				except:
 					pass
 

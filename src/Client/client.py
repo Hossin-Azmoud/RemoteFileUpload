@@ -52,7 +52,7 @@ class Client:
 		
 		if not FileBlobObject.chunked:
 			self.SOCKET.send(FileBlobObject.bytes)
-			self.HoldForResult()
+			self.HoldForResult(FileBlobObject)
 			return
 
 		self.SendFileBuffered(FileBlobObject)
@@ -84,6 +84,7 @@ class Client:
 			if ParsedLen > 0:
 				Data_ = self.SOCKET.recv(ParsedLen).decode(self.FORMAT)
 				LoadedResult = loads(Data_)
+				
 				if LoadedResult["code"] == 200:
 					print()
 					print(f"({sentFile.fn}):{sentFile.size} -> { self.SERVER }")
