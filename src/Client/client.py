@@ -56,7 +56,7 @@ class Client:
 			return
 
 		self.SendFileBuffered(FileBlobObject)
-		self.HoldForResult()
+		self.HoldForResult(FileBlobObject)
 
 	def close(self):
 		self.SOCKET.close()
@@ -76,7 +76,7 @@ class Client:
 	def SendFileBuffered(self, FileBlobObject):		
 		for chunk in FileBlobObject: self.sendFileChunk(chunk.content, chunk.size)
 
-	def HoldForResult(self):
+	def HoldForResult(self, sentFile):
 		Length_ = self.SOCKET.recv(self.HEADER).decode(self.FORMAT)
 		
 		if Length_:
@@ -86,48 +86,11 @@ class Client:
 				LoadedResult = loads(Data_)
 				if LoadedResult["code"] == 200:
 					print()
-					print("Success")
-					print(LoadedResult["text"])
+					print(f"({sentFile.fn}):{sentFile.size} -> { self.SERVER }")
+					print(f"Sent!")
+
 				else:
 					print()
-					print("Failed! an error accured.")
-					print(LoadedResult["text"])
-
-
-
-
-def sendBufferdProtoType():
-		CHUNK_SIZE = 1024
-		size = 1024 * 10
-		
-		Filebytes = ''.join(
-			[chr(randint(0, 256)) for i in range(size)]
-		).encode()
-
-		print(size, " bytes Was generated!")
-		print("Buffering...")
-
-		BuffStream = []
-		ReachableBytesIndex = size - (size % CHUNK_SIZE)
-		index = 0
-		# assert (ReachableBytesIndex == size - 100), "The formula for last reachable byte is incorrect."
-		
-		print("Remaining bytes ->", size % CHUNK_SIZE)
-		print("Last reachable ->", size - size % CHUNK_SIZE)
-
-
-		while index + CHUNK_SIZE < ReachableBytesIndex:
-			print(f"{ index  } : { index + CHUNK_SIZE}", end="\r")
-			BuffStream.append(Filebytes[index : (index + CHUNK_SIZE)])
-			index += CHUNK_SIZE
-		
-
-		print("Adding Remaining bytes:")
-		
-
-		BuffStream.append(Filebytes[index : index + (size % CHUNK_SIZE)])
-		
-		for chunk in BuffStream:
-			# Send to the server.
-			send(len(chunk))
-			send(chunk)
+					print(f"File {sentFile.fn} was not sent.")
+					print("Error log:", LoadedResult["text"])
+					
