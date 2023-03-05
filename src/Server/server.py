@@ -73,6 +73,8 @@ class server:
 		self.AuthManager = ConstructAuthManager(configClass)
 		self.configClass = configClass
 	
+	def resetPassword(self, newPassword):
+		self.AuthManager
 	def SetHost(self, host): 
 		self.SERVER = host
 

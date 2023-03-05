@@ -1,10 +1,10 @@
 from json import dump, load
-from os import path
+from os import path, mkdir
 from hashlib import sha256
 from pprint import pprint
 
 class RFUConfig:
-	"""  """	
+	"""  """
 	
 	def __init__(self):
 		self.configPath = "./server_config.json"
@@ -12,17 +12,23 @@ class RFUConfig:
 		
 		if not (self.LoadConfig()):
 			self.AddConfig()
+
 	@property
 	def SavePath(self): return self.ConfigObject["save_path"]
+	
 	def joinWithSavePath(self, o): 
 		return path.join(self.SavePath, o)
 	
-	def GetValueByKey(self, k): return self.ConfigObject[k]
+	def GetValueByKey(self, k): 
+		return self.ConfigObject[k]
+	
 	def SetValue(self, k, v):
+		
 		self.LoadConfig()
 		if (k and v): 
 			self.ConfigObject[k] = v
 			self.DumpConfig(self.ConfigObject)
+			
 			return True
 		return False
 
@@ -58,8 +64,8 @@ class RFUConfig:
 				"pwd": config["pwd"],
 				"save_path": config["save_path"]
 			}
-
-			self.DumpConfig(self.ConfigObject)
+			
+			self.apply().DumpConfig(self.ConfigObject)
 
 	def LoadConfig(self):
 		if path.exists(self.configPath):
@@ -68,5 +74,13 @@ class RFUConfig:
 				return True
 		return False
 
+	def apply(self):
+		if self.ConfigObject:
+			save_path_ = self.ConfigObject["save_path"]
+			if not path.exists(save_path_):
+				mkdir(save_path_)
+		return self
+
 	def DumpConfig(self, New):
-		with open(self.configPath, "w+") as f: dump(New, f)
+		with open(self.configPath, "w+") as f: 
+			dump(New, f)

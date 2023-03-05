@@ -9,7 +9,7 @@ from random import randint
 # stripping the name of the program.
 from time import sleep
 
-PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG = '-p', '--host', '-f', '--chunked'
+PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG, KEY_FLAG = '-p', '--host', '-f', '--chunked', '--key'
 argv = argv[1:]
 argc = len(argv)
 
@@ -18,7 +18,7 @@ argc = len(argv)
 def parseArgs(argv: list[str], argc: int) -> dict:
 	
 	mappedArgs = {  }
-	availableArgs = [PORT_FLAG, HOST_FLAG, FILE_FLAG]
+	availableArgs = [PORT_FLAG, HOST_FLAG, FILE_FLAG, KEY_FLAG]
 
 	if argc > 0:	
 		for (i, v) in enumerate(argv):
@@ -39,6 +39,9 @@ def Settings(InstanceClass: server | Client, arg: dict):
 	if PORT_FLAG in arg:
 		InstanceClass.SetPort(int(arg[PORT_FLAG]))
 
+	if KEY_FLAG in arg:
+		InstanceClass.SetPassword(arg[KEY_FLAG])
+
 def ServerRoute(arg):
 	s = server()
 	# Takes care of auth and managing paths.
@@ -49,7 +52,6 @@ def ServerRoute(arg):
 
 def ClientRoute(arg):
 	c = Client()
-
 	Settings(c, arg)
 	c.setPassword()
 	c.connect()

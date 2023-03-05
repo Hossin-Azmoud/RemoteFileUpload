@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from json import dumps, loads
 from base64 import b64encode
 from .File import FileBlob
+from time import time
 
 @dataclass
 class Client:
@@ -33,6 +34,7 @@ class Client:
 			))
 	
 	def send(self, msg):
+		
 		if not isinstance(msg, str):
 			msg = dumps(msg)
 
@@ -45,7 +47,9 @@ class Client:
 
 		print("Header is too small for msg!")
 
+
 	def SendFileBytes(self, FileBlobObject):
+		
 		if not FileBlobObject.chunked:
 			self.SOCKET.send(FileBlobObject.bytes)
 			self.HoldForResult()
@@ -69,24 +73,8 @@ class Client:
 		self.SOCKET.send((str(size) + padding).encode(self.FORMAT))
 		self.SOCKET.send(chunk)
 
-	def SendFileBuffered(self, FileBlobObject):
-		
-		CHUNK_SIZE = 1024
-		
-		remains = (FileBlobObject.size % CHUNK_SIZE)
-		Tail = FileBlobObject.size - remains
-		Head = 0
-
-		# assert (ReachableBytesIndex == size - 100), "The formula for last reachable byte is incorrect."
-		while Head + CHUNK_SIZE < Tail:
-			
-			self.sendFileChunk(FileBlobObject.bytes[Head : (Head + CHUNK_SIZE)], CHUNK_SIZE)
-			Head += CHUNK_SIZE
-
-		if remains > 0:
-			self.sendFileChunk(FileBlobObject.bytes[Head : Head + remains], remains)
-		
-
+	def SendFileBuffered(self, FileBlobObject):		
+		for chunk in FileBlobObject: self.sendFileChunk(chunk.content, chunk.size)
 
 	def HoldForResult(self):
 		Length_ = self.SOCKET.recv(self.HEADER).decode(self.FORMAT)

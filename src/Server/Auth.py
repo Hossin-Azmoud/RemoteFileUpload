@@ -14,7 +14,7 @@ class Auth:
 		return self.provider.GetValueByKey('pwd')
 		
 	def SetPassword(self, new):
-		return self.provider.SetValue('pwd', new)
+		return self.provider.SetValue('pwd', self.GenericHash(new))
 
 	def CheckPassword(self, P): 
 		return ( self.Password == self.GenericHash(P) )

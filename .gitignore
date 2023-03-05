@@ -1,4 +1,4 @@
-src/testing
+/src/testing
 /testing
 testing
 ./testing
@@ -7,3 +7,5 @@ TODO.txt
 /venv
 venv
 __pycache__
+# my config files
+server_config.json
