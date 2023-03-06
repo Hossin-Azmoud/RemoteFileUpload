@@ -1,36 +1,25 @@
 import socket
-from dataclasses import dataclass
 from json import dumps, loads
 from base64 import b64encode
-from .File import FileBlob
 from time import time
 
-@dataclass
 class Client:
-	PORT: int = 4000
-	SERVER: str = None
-	SOCKET: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	HEADER: int = 32
-	DISCONNECTING: str = "!DISCONNECT"
-	FORMAT: str = "utf-8"
-
-	def SetHost(self, host):
-		self.SERVER = host
-
-	def SetPort(self, NewPort):
-		self.PORT = NewPort
-
-	def setPassword(self):
-		p = input(f"Type in password to connect to ({self.SERVER}) :")
-		self.pwd = p
-
+	def __init__(self):
+		self.sock: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.port = 4000
+		self.host = "localhost"
+		self.header = 32
+		self.encoding_format = "utf-8"
+	
+	def SetHost(self, host):   	 self.host = host
+	def SetPort(self, NewPort):	 self.port = NewPort
+	def setPassword(self):     	 self.pwd = input(f"Type in password to connect to ({self.host}) :")
 	def connect(self):
 		""" connects to a host! """
-		
-		if self.SERVER:
-			print(f"CONNECTING TO -> { self.SERVER }")
-			self.SOCKET.connect((
-				self.SERVER, self.PORT
+		if self.host:
+			print(f"CONNECTING TO -> { self.host }")
+			self.sock.connect((
+				self.host, self.port
 			))
 	
 	def send(self, msg):
@@ -39,55 +28,50 @@ class Client:
 			msg = dumps(msg)
 
 		MessageLengthAsInt = len(msg)	
-		if  len(str(MessageLengthAsInt)) <= self.HEADER:
-			padding = " " * (self.HEADER - len(str(MessageLengthAsInt)))
-			self.SOCKET.send((str(MessageLengthAsInt) + padding).encode(self.FORMAT))
-			self.SOCKET.send(msg.encode(self.FORMAT))
+		if  len(str(MessageLengthAsInt)) <= self.header:
+			padding = " " * (self.header - len(str(MessageLengthAsInt)))
+			self.sock.send((str(MessageLengthAsInt) + padding).encode(self.encoding_format))
+			self.sock.send(msg.encode(self.encoding_format))
 			return
 
 		print("Header is too small for msg!")
 
 
-	def SendFileBytes(self, FileBlobObject):
+	def SendFileBytes(self, File_sender):
 		
-		if not FileBlobObject.chunked:
-			self.SOCKET.send(FileBlobObject.bytes)
-			self.HoldForResult(FileBlobObject)
+		if not File_sender.chunked:
+			File_sender.send(self.sock, (lambda : self.HoldForResult(File_sender)))
 			return
 
-		self.SendFileBuffered(FileBlobObject)
-		self.HoldForResult(FileBlobObject)
-
 	def close(self):
-		self.SOCKET.close()
+		self.sock.close()
 	
-	def SendFile(self, fn, chunked_flag=False):
-		FileBlobObject = FileBlob(fn, chunked = chunked_flag)
-		self.send(FileBlobObject.FileInformationHeader(self.pwd))
-		self.SendFileBytes(FileBlobObject)
+	def SendFile(self, File_sender):
+		self.send(File_sender.FileInformationHeader(self.pwd))
+		self.SendFileBytes(File_sender)
 		return
 
 
 	def sendFileChunk(self, chunk: bytes, size: int):
-		padding = " " * (self.HEADER - len(str(size)))
-		self.SOCKET.send((str(size) + padding).encode(self.FORMAT))
-		self.SOCKET.send(chunk)
+		padding = " " * (self.header - len(str(size)))
+		self.sock.send((str(size) + padding).encode(self.encoding_format))
+		self.sock.send(chunk)
 
 	def SendFileBuffered(self, FileBlobObject):		
 		for chunk in FileBlobObject: self.sendFileChunk(chunk.content, chunk.size)
 
 	def HoldForResult(self, sentFile):
-		Length_ = self.SOCKET.recv(self.HEADER).decode(self.FORMAT)
+		Length_ = self.sock.recv(self.header).decode(self.encoding_format)
 		
 		if Length_:
 			ParsedLen = int(Length_.strip())
 			if ParsedLen > 0:
-				Data_ = self.SOCKET.recv(ParsedLen).decode(self.FORMAT)
+				Data_ = self.sock.recv(ParsedLen).decode(self.encoding_format)
 				LoadedResult = loads(Data_)
 				
 				if LoadedResult["code"] == 200:
 					print()
-					print(f"({sentFile.fn}):{sentFile.size} -> { self.SERVER }")
+					print(f"({sentFile.fn}):{sentFile.size} -> { self.host }")
 					print(f"Sent!")
 
 				else:

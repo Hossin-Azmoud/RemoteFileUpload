@@ -1,8 +1,7 @@
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from json import dumps
 from pathlib import Path
 from dataclasses import dataclass
-
 CHUNK_SIZE = 1024 # IN BYTES.
 
 class Bounds:
@@ -34,7 +33,7 @@ class Chunk:
 	size: int
 
 
-class FileBlob:
+class FileSender:
 
 	def __init__(self, fn, chunked = False) -> None:
 		self.chunked = chunked
@@ -43,6 +42,10 @@ class FileBlob:
 		self.fn = self.fileObject.name
 		self.size = len(self.bytes)
 		self.Fileboundz: Bounds = Bounds(Tail = 0, Head = CHUNK_SIZE)
+
+	def send(self, sock, callback):
+		sock.send(self.bytes)
+		callback()
 
 	def FileInformationHeader(self, pwd) -> dict:
 		
@@ -86,3 +89,44 @@ class FileBlob:
 			)
 	
 		raise StopIteration
+
+class FileReceiver:
+	def __init__(self, fn=None, size=0) -> None:	
+		self.fn = fn
+		self.size = size
+		self.Buffer = b''
+		
+
+	def SetProperties(self, fn: str, size: int):
+		self.SetFn(fn)
+		self.SetSize(size)
+
+	def SetFn(self, new: str) -> str:
+		self.fn = new.replace("./", "").replace(".\\", "")
+		return new
+
+	def SetSize(self, new: int) -> int: 
+		self.size = new
+		return new
+
+	def writeBuff(self, out_path):
+		with open(self.make_path(out_path), "wb") as fp: 
+			fp.write(self.Buffer)
+
+	def DecodeReceivedBuff(self): self.Buffer = b64decode(self.Buffer)
+	
+	def ReceiveFileBuff(self, Conn, output_path, callback):
+		
+		self.Buffer = Conn.recv(self.size)
+		
+		if self.Buffer and self.fn:
+			self.DecodeReceivedBuff()
+			self.writeBuff(output_path)
+
+		callback()
+
+	def make_path(self, out_dir):
+		delim = "/"
+		out_dir = out_dir.replace("\\", delim)
+		return delim.join([out_dir, self.fn])
+	

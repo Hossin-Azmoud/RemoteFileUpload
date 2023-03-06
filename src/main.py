@@ -8,8 +8,11 @@ import datetime
 from random import randint
 # stripping the name of the program.
 from time import sleep
+from FileHandler import FileSender, FileReceiver
+PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG, KEY_FLAG, RESET_FLAG = '-p', '--host', '-f', '--chunked', '--key', '--reset'
+SERVER: str = "-s"
+CLIENT: str = "-c"
 
-PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG, KEY_FLAG = '-p', '--host', '-f', '--chunked', '--key'
 argv = argv[1:]
 argc = len(argv)
 
@@ -18,7 +21,10 @@ argc = len(argv)
 def parseArgs(argv: list[str], argc: int) -> dict:
 	
 	mappedArgs = {  }
-	availableArgs = [PORT_FLAG, HOST_FLAG, FILE_FLAG, KEY_FLAG]
+
+	availableArgs = [
+		PORT_FLAG, HOST_FLAG, FILE_FLAG, KEY_FLAG
+	]
 
 	if argc > 0:	
 		for (i, v) in enumerate(argv):
@@ -29,26 +35,16 @@ def parseArgs(argv: list[str], argc: int) -> dict:
 	return mappedArgs
 
 
-SERVER: str = "-s"
-CLIENT: str = "-c"
-
 def Settings(InstanceClass: server | Client, arg: dict):
-	if HOST_FLAG in arg:
-		InstanceClass.SetHost(arg[HOST_FLAG])
-	
-	if PORT_FLAG in arg:
-		InstanceClass.SetPort(int(arg[PORT_FLAG]))
-
-	if KEY_FLAG in arg:
-		InstanceClass.SetPassword(arg[KEY_FLAG])
+	if HOST_FLAG in arg:   InstanceClass.SetHost(arg[HOST_FLAG])
+	if PORT_FLAG in arg:   InstanceClass.SetPort(int(arg[PORT_FLAG]))
+	if KEY_FLAG in arg:    InstanceClass.SetPassword(arg[KEY_FLAG])
 
 def ServerRoute(arg):
-	s = server()
-	# Takes care of auth and managing paths.
-	s.SetConfigInstance(RFUConfig())
+	FileReceiverInstance, ConfigInstance = FileReceiver(), RFUConfig()
+	s = server(FileReceiverInstance, ConfigInstance)
 	Settings(s, arg)
 	s.Listen()
-
 
 def ClientRoute(arg):
 	c = Client()
@@ -57,8 +53,8 @@ def ClientRoute(arg):
 	c.connect()
 	
 	if FILE_FLAG in arg:
-		
-		c.SendFile(arg[FILE_FLAG], chunked_flag=(CHUNKED_FLAG in argv))
+		fhandle = FileSender(arg[FILE_FLAG], chunked=(CHUNKED_FLAG in argv))
+		c.SendFile(fhandle)
 	else:
 		print("File was not specified:")
 		print("How to: ")
@@ -66,7 +62,7 @@ def ClientRoute(arg):
 
 	c.close()
 	
-progs = {
+routes = {
 	"-s": ServerRoute,
 	"-c": ClientRoute
 }
@@ -74,11 +70,10 @@ progs = {
 def main():
 
 	arguments = parseArgs(argv[1:], argc - 1)
-	# print(arguments)
 
 	if argc > 0:
-		if argv[0] in progs: 
-			progs[argv[0]](arguments)
+		if argv[0] in routes: 
+			routes[argv[0]](arguments)
 	else:		
 		print()
 		print("Remote share command line app.")
@@ -86,5 +81,4 @@ def main():
 		print("-f used only by the client to send data.")
 		print("--chunked for breaking down larger files.")
 
-if __name__ == '__main__': 
-	main()
+if __name__ == '__main__': main()

@@ -66,27 +66,21 @@ def DecodeClientMessage(ClientMessage: str):
 
 	return False
 
-@dataclass
+
 class server:
-	clients: list = field(default_factory=list)
-	PORT: int = 4000
-	SERVER: str = socket.gethostbyname(socket.gethostname())
-	SOCKET: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	HEADER: int = 32
-	FORMAT: str = "utf-8"
-	DISCONNECTING: str = "!DISCONNECT"
-
-	def SetConfigInstance(self, configClass):
-		self.AuthManager = ConstructAuthManager(configClass)
-		self.configClass = configClass
 	
-	def resetPassword(self, newPassword):
-		self.AuthManager
-	def SetHost(self, host): 
-		self.SERVER = host
+	def __init__(self, FileReceiverInstance, ConfigInstance) -> None:
+		self.AuthManager    	   =  ConstructAuthManager(ConfigInstance)
+		self.ConfigInstance 	   =  ConfigInstance
+		self.FileReceiver  	   =  FileReceiverInstance
+		self.port       		   = 4000
+		self.ServerHost 		   = socket.gethostbyname(socket.gethostname())
+		self.sock       		   = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.header     		   = 32
+		self.encoding_format       = "utf-8"
 
-	def SetPort(self, NewPort):
-		self.PORT = NewPort
+	def SetHost(self, host):  self.ServerHost = host
+	def SetPort(self, NewPort): self.port = NewPort
 
 	def RecvChunks(self, Conn, address, length, fn):
 		
@@ -96,7 +90,7 @@ class server:
 
 		while (recv_byte_len < length):
 
-			ChunkSize = int(Conn.recv(self.HEADER).decode(self.FORMAT).strip())
+			ChunkSize = int(Conn.recv(self.header).decode(self.encoding_format).strip())
 			tmp_buffer += Conn.recv(ChunkSize)
 			recv_byte_len += ChunkSize
 
@@ -105,21 +99,6 @@ class server:
 
 	def OK(self, Conn): self.sendResult(Conn, OK)
 	def Error(self, Conn): self.sendResult(Conn, NOT_OK)
-
-	def DumpBytes(self, fn, bytes_, size_repr, mode='wb'):
-		print(f"{ size_repr } was received !")
-		
-		with open(self.configClass.joinWithSavePath(fn), mode) as f: 
-			f.write(b64decode(bytes_))
-
-		print("[DONE]")
-
-	def recvFileBlob(self, Conn, address, length, fn):
-		print(f"{ address }:{fn} -> ./RFUFiles/{ fn }")
-		Filebytes = Conn.recv(length)
-		self.DumpBytes(fn, Filebytes, GetSizeInProperUnit(length))
-		self.OK(Conn)
-
 
 	def sendResult(self, Conn, Code, Text=None):
 		
@@ -148,26 +127,33 @@ class server:
 			)
 
 	def connect(self, conn, clientInfo):
+		
 		address, port = clientInfo
 		connected = True
-		
 		while connected:
 			
-			FileHeaderLength = conn.recv(self.HEADER).decode(self.FORMAT)
+			FileHeaderLength = conn.recv(self.header).decode(self.encoding_format)
 			
 			if FileHeaderLength:
 				ParsedLen = int(FileHeaderLength.strip())
-								
+
 				if ParsedLen > 0:
-					Data_ = conn.recv(ParsedLen).decode(self.FORMAT)
+					Data_ = conn.recv(ParsedLen).decode(self.encoding_format)
+					
 					ClientMsg = DecodeClientMessage(Data_)
-				
+									
 					if ClientMsg:
 						fn, length, pwd, buf = ClientMsg
 
 						if self.AuthManager.CheckPassword(pwd):
 							if not buf:
-								self.recvFileBlob(conn, address, length, fn)
+								# self.recvFileBlob(conn, address, length, fn)
+								print("receivig file from ", address)
+								print("File Name: ", fn)
+								print("Length: ", length)
+							
+								self.FileReceiver.SetProperties(fn, length)
+								self.FileReceiver.ReceiveFileBuff(conn, self.ConfigInstance.SavePath, (lambda : self.OK(conn)))
 								connected = False
 							else:
 								# TODO: Make buffreceiver. for chunked data.
@@ -177,7 +163,6 @@ class server:
 							self.sendResult(conn, NOT_OK, "Wrong password!")
 							connected = False
 					else:
-						
 						self.sendResult(conn, NOT_OK, f"""
 							Invalid header msg, should be: pwd: ..., fn: ..., length: ...
 							Instead received keys: { Data_ }
@@ -197,10 +182,10 @@ class server:
 		
 		MessageLengthAsInt = len(msg)	
 		
-		if  len(str(MessageLengthAsInt)) <= self.HEADER:
-			padding = " " * (self.HEADER - len(str(MessageLengthAsInt)))
-			Conn.send((str(MessageLengthAsInt) + padding).encode(self.FORMAT))
-			Conn.send(msg.encode(self.FORMAT))
+		if  len(str(MessageLengthAsInt)) <= self.header:
+			padding = " " * (self.header - len(str(MessageLengthAsInt)))
+			Conn.send((str(MessageLengthAsInt) + padding).encode(self.encoding_format))
+			Conn.send(msg.encode(self.encoding_format))
 			return
 
 		print("Header is too small for msg!")
@@ -208,9 +193,9 @@ class server:
 	def Listen(self):
 		self.bind_()
 		
-		with self.SOCKET as Sock:
+		with self.sock as Sock:
 			Sock.listen(10)	
-			print(f"Server Started {self.SERVER}:{self.PORT}")
+			print(f"Server Started {self.ServerHost}:{self.port}")
 
 			while True:
 				conn, clientInfo = Sock.accept()
@@ -219,7 +204,7 @@ class server:
 
 
 	def bind_(self):
-		self.SOCKET.bind((self.SERVER, self.PORT))
+		self.sock.bind((self.ServerHost, self.port))
 
 	def close(self):
-		self.SOCKET.close()
+		self.sock.close()
