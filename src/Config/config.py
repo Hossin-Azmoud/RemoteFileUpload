@@ -14,13 +14,15 @@ class RFUConfig:
 			self.AddConfig()
 
 	@property
-	def SavePath(self): return self.ConfigObject["save_path"]
+	def SavePath(self): return self.GetValueByKey("save_path")
+
+	@property
+	def pwd(self): return self.GetValueByKey("pwd")
 	
 	def joinWithSavePath(self, o): 
 		return path.join(self.SavePath, o)
 	
-	def GetValueByKey(self, k): 
-		return self.ConfigObject[k]
+	def GetValueByKey(self, k): return self.ConfigObject[k]
 	
 	def SetValue(self, k, v):
 		

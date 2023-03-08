@@ -1,60 +1,49 @@
 import socket
 from threading import Thread
 from sys import argv
-from Server import server
-from Client import Client
-from Config import RFUConfig
+from server import FileServer
+from client import FileClient
 import datetime
 from random import randint
 # stripping the name of the program.
 from time import sleep
-from FileHandler import FileSender, FileReceiver
-PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG, KEY_FLAG, RESET_FLAG = '-p', '--host', '-f', '--chunked', '--key', '--reset'
-SERVER: str = "-s"
-CLIENT: str = "-c"
+from Util import (
+	PORT_FLAG,
+	HOST_FLAG,
+	FILE_FLAG,
+	CHUNKED_FLAG,
+	KEY_FLAG,
+	RESET_FLAG,
+	CLOSE,
+	parseArgs
+)
 
 argv = argv[1:]
 argc = len(argv)
 
-
-
-def parseArgs(argv: list[str], argc: int) -> dict:
-	
-	mappedArgs = {  }
-
-	availableArgs = [
-		PORT_FLAG, HOST_FLAG, FILE_FLAG, KEY_FLAG
-	]
-
-	if argc > 0:	
-		for (i, v) in enumerate(argv):
-			if v in availableArgs:
-				next_ = (i + 1)
-				if  next_ <= (argc - 1): mappedArgs[v] = argv[next_]
-
-	return mappedArgs
-
-
-def Settings(InstanceClass: server | Client, arg: dict):
+def Settings(InstanceClass: FileServer | FileClient, arg: dict):
 	if HOST_FLAG in arg:   InstanceClass.SetHost(arg[HOST_FLAG])
 	if PORT_FLAG in arg:   InstanceClass.SetPort(int(arg[PORT_FLAG]))
 	if KEY_FLAG in arg:    InstanceClass.SetPassword(arg[KEY_FLAG])
 
-def ServerRoute(arg):
-	FileReceiverInstance, ConfigInstance = FileReceiver(), RFUConfig()
-	s = server(FileReceiverInstance, ConfigInstance)
+def FileServerRoute(arg):
+	s = FileServer()
 	Settings(s, arg)
 	s.Listen()
 
-def ClientRoute(arg):
-	c = Client()
+def FileClientRoute(arg):
+	c = FileClient()
 	Settings(c, arg)
 	c.setPassword()
 	c.connect()
-	
+	print(arg)
 	if FILE_FLAG in arg:
 		fhandle = FileSender(arg[FILE_FLAG], chunked=(CHUNKED_FLAG in argv))
 		c.SendFile(fhandle)
+	
+	if CLOSE in argv: 
+		c.SendCloseServerCommand()
+	
 	else:
 		print("File was not specified:")
 		print("How to: ")
@@ -63,8 +52,8 @@ def ClientRoute(arg):
 	c.close()
 	
 routes = {
-	"-s": ServerRoute,
-	"-c": ClientRoute
+	"-s": FileServerRoute,
+	"-c": FileClientRoute
 }
 
 def main():
