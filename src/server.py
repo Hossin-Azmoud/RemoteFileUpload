@@ -45,7 +45,8 @@ class FileServer:
 		self.ServerHost 		   = socket.gethostbyname(socket.gethostname())
 		self.sock       		   = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.header     		   = 32
-		self.Running               = True
+		self.isOpen                = True
+	
 	def SetHost(self, host):  self.ServerHost = host
 	def SetPort(self, NewPort): self.port = NewPort
 
@@ -64,10 +65,8 @@ class FileServer:
 		self.DumpBytes(fn, tmp_buffer)
 		self.OK(Conn)
 
-	def kill(self):
+	def kill(self): 
 		self.close()
-		self.Running = False
-		exit(0)
 
 	def ExecuteCommand(self, Client_, c: str) -> None:
 		if c == EXIT:
@@ -84,8 +83,6 @@ class FileServer:
 
 		elif Code == NOT_OK: 
 			self.send( Client_.Conn, ErrorResp(T=Text) )
-
-
 		else: 
 			self.send( Client_.Conn, NewServerResponse(T=Text, C=Code) )
 
@@ -120,6 +117,7 @@ class FileServer:
 
 
 	def connect(self, Client_):
+		
 		while Client_.connected:
 			FileHeaderLength = Serializer.Decode_UTF8(Client_.Conn.recv(self.header))
 			
@@ -159,19 +157,38 @@ class FileServer:
 		print("Header is too small for msg!")
 
 	def Listen(self):
+		
 		self.bind_()
 		
 		with self.sock as Sock:
-			Sock.listen(10)	
-			print(f"Server Started {self.ServerHost}:{self.port}")
-			while self.Running:
-				conn, connectInformation = Sock.accept()
-				address, port = connectInformation
-				C = Client(conn, address, port)		
-				Thread_ = Thread(target=self.connect, args=(C, ))
-				Thread_.start()
-			else:
-				exit(0)
+			Sock.listen(10)
+			print(f"Server Started { self.ServerHost }:{ self.port }")
+		
+			while True:
+				
+				
+				if self.isOpen:
+					try:
+						conn, connectInformation = Sock.accept()
+						address, port = connectInformation
+						C = Client(conn, address, port)		
+						Thread_ = Thread(target=self.connect, args=(C, ))
+						Thread_.start()
+					
+					except OSError as e:
+						print("CLOSED")
 
+					except Exception as e:
+						print(e)
+
+					continue
+
+				break
+				
 	def bind_(self): self.sock.bind((self.ServerHost, self.port))
-	def close(self): self.sock.close()
+	
+	def close(self): 
+		self.isOpen = False
+		print("Closing!")
+		print(self.isOpen)
+		self.sock.close()
