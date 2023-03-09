@@ -7,7 +7,10 @@ import datetime
 from random import randint
 # stripping the name of the program.
 from time import sleep
+from FileHandler import FileSender
+
 from Util import (
+	Help,
 	PORT_FLAG,
 	HOST_FLAG,
 	FILE_FLAG,
@@ -32,23 +35,23 @@ def FileServerRoute(arg):
 	s.Listen()
 
 def FileClientRoute(arg):
+	
 	c = FileClient()
+	check = False
 	Settings(c, arg)
 	c.setPassword()
 	c.connect()
-	print(arg)
+
 	if FILE_FLAG in arg:
 		fhandle = FileSender(arg[FILE_FLAG], chunked=(CHUNKED_FLAG in argv))
 		c.SendFile(fhandle)
-	
+		check = True
+
 	if CLOSE in argv: 
 		c.SendCloseServerCommand()
-	
-	else:
-		print("File was not specified:")
-		print("How to: ")
-		print("-f <File relative/Abs path>")
 
+	if not check: Help()
+	
 	c.close()
 	
 routes = {
@@ -64,10 +67,6 @@ def main():
 		if argv[0] in routes: 
 			routes[argv[0]](arguments)
 	else:		
-		print()
-		print("Remote share command line app.")
-		print("USAGE: main.py [-s/-c] -p [default: 4000] --host [default: current Host] -f <filePath> --chunked")
-		print("-f used only by the client to send data.")
-		print("--chunked for breaking down larger files.")
+		Help()
 
 if __name__ == '__main__': main()

@@ -2,6 +2,7 @@ from base64 import b64encode, b64decode
 from json import dumps
 from pathlib import Path
 from dataclasses import dataclass
+from os import stat
 CHUNK_SIZE = 1024 # IN BYTES.
 
 class Bounds:
@@ -12,7 +13,7 @@ class Bounds:
 
 	@property
 	def size_in_between(self):
-		return abs(self.Tail - self.Head)
+		return abs(self.Head - self.Tail)
 
 	def __add__(self, other):
 		if isinstance(other, int):
@@ -29,23 +30,59 @@ class Bounds:
 
 @dataclass
 class Chunk:
-	content: bytes
-	size: int
 
+	content: bytes
+	size:    int
+
+	def EncodeB64(self):
+		self.content = b64encode(self.content)
+		self.size = len(self.content)
+
+	def DecodeB64(self):
+		self.content = b64decode(self.content)
+		self.size = len(self.content)
 
 class FileSender:
 
 	def __init__(self, fn, chunked = False) -> None:
+		
 		self.chunked = chunked
 		self.fileObject = Path(fn)
-		self.bytes = b64encode(self.fileObject.read_bytes())
 		self.fn = self.fileObject.name
-		self.size = len(self.bytes)
-		self.Fileboundz: Bounds = Bounds(Tail = 0, Head = CHUNK_SIZE)
+		self.size = stat(self.fileObject).st_size
 
 	def send(self, sock, callback):
-		sock.send(self.bytes)
+		sock.send(self.bytes_)
 		callback()
+
+	def sendChunks(self, callback: callable):
+
+		read = 0
+		
+		with open(self.fileObject, "rb") as fp: 
+
+			while read < (self.size - (self.size % CHUNK_SIZE)):				
+				# Read Chunk
+				ChunkBytes = fp.read(CHUNK_SIZE)
+				
+				# encapsulate Chunk
+				chunkObj = Chunk(content=ChunkBytes, size=CHUNK_SIZE)
+				chunkObj.EncodeB64()
+				callback(chunkObj)
+				
+				read += CHUNK_SIZE
+
+			if (self.size % CHUNK_SIZE) > 0:
+				ChunkBytes = fp.read(self.size % CHUNK_SIZE)
+				
+				chunkObj = Chunk(content=ChunkBytes, size=(self.size % CHUNK_SIZE))
+				chunkObj.EncodeB64()
+				callback(chunkObj)
+				
+			read += self.size % CHUNK_SIZE
+			
+			print("Finished Reading chunks.", self.size, read)
+
 
 	def FileInformationHeader(self, pwd) -> dict:
 		
@@ -63,40 +100,13 @@ class FileSender:
 			"pwd": pwd
 		}
 
-	
-	def __iter__(self):
-		return self
-		
-
-	def __next__(self):
-		
-		rest = self.size % CHUNK_SIZE
-		TailCursor, HeadCursor = (self.Fileboundz.Tail, self.Fileboundz.Head)
-		
-		if (HeadCursor + CHUNK_SIZE < self.size - rest):
-			self.Fileboundz += CHUNK_SIZE
-			return Chunk(
-				content=self.bytes[self.Fileboundz.Tail : self.Fileboundz.Head], 
-				size=self.Fileboundz.size_in_between
-			)
-			
-		if (HeadCursor + rest < self.size):
-			self.Fileboundz.Tail += CHUNK_SIZE
-			self.Fileboundz.Head += rest
-			return Chunk(
-				content=self.bytes[self.Fileboundz.Tail : self.Fileboundz.Head], 
-				size=self.Fileboundz.size_in_between
-			)
-	
-		raise StopIteration
-
 class FileReceiver:
+	
 	def __init__(self, fn=None, size=0) -> None:	
 		self.fn = fn
 		self.size = size
 		self.Buffer = b''
-		
-
+	
 	def SetProperties(self, fn: str, size: int):
 		self.SetFn(fn)
 		self.SetSize(size)
@@ -110,18 +120,47 @@ class FileReceiver:
 		return new
 
 	def writeBuff(self, out_path):
+		
 		with open(self.make_path(out_path), "wb") as fp: 
+			print(f"\n{ self.fn } -> DISC ")
 			fp.write(self.Buffer)
+			self.Buffer = b''
 
 	def DecodeReceivedBuff(self): self.Buffer = b64decode(self.Buffer)
+
+	def Notify(self, Client_):
+		print("Upcoming File write from : ", Client_.Addr)
+		print("File Name : ", self.fn)
+		print("Size : ", self.size)
+
 	
-	def ReceiveFileBuff(self, Conn, output_path, callback):
-		
-		self.Buffer = Conn.recv(self.size)
+	def ReceiveFileBuff(self, Client_, output_path, callback):
+		self.Notify(Client_)
+		self.Buffer = Client_.Conn.recv(self.size)
 		
 		if self.Buffer and self.fn:
 			self.DecodeReceivedBuff()
 			self.writeBuff(output_path)
+
+		callback()
+
+	def ReceiveFileBuffChunked(self, Client_, output_path, callback, onProgress):
+		self.Notify(Client_)
+		received = 0
+		onProgress(received, self.size - received, self.size)
+		
+		while (received < self.size):
+
+			ChunkSize_b64 = int(Client_.Conn.recv(32).decode("utf-8").strip())
+			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
+			chunkObj = Chunk(content=RecvChunk_b64, size=ChunkSize_b64)
+			chunkObj.DecodeB64()
+			received += chunkObj.size
+			self.Buffer += chunkObj.content
+			
+			onProgress(received, self.size - received, self.size)
+
+		if self.Buffer and self.fn: self.writeBuff(output_path)
 
 		callback()
 

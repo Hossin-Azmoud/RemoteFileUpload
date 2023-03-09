@@ -1,1 +1,1 @@
-from .File import FileSender, FileReceiver
+from .File import FileSender, FileReceiver, Chunk

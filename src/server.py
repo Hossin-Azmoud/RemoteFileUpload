@@ -13,6 +13,7 @@ from FileHandler import FileReceiver
 from Transmission import (
 	Serializer,
 	ClientMessage,
+	GetSizeInProperUnit,
 	OKResp,
 	ErrorResp,
 	EXIT,
@@ -41,32 +42,19 @@ class FileServer:
 		self.ConfigInstance 	   =  RFUConfig()
 		self.AuthManager    	   =  ConstructAuthManager(self.ConfigInstance)
 		self.FileReceiver  	   	   =  FileReceiver()
-		self.port       		   = 4000
-		self.ServerHost 		   = socket.gethostbyname(socket.gethostname())
-		self.sock       		   = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.header     		   = 32
-		self.isOpen                = True
+		self.port       		   =  4000
+		self.ServerHost 		   =  socket.gethostbyname(socket.gethostname())
+		self.sock       		   =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.header     		   =  32
+		self.isOpen                =  True
 	
 	def SetHost(self, host):  self.ServerHost = host
 	def SetPort(self, NewPort): self.port = NewPort
-
-	def RecvChunks(self, Conn, address, length, fn):
-		
-		recv_byte_len = 0
-		initializedFile = False
-		tmp_buffer = b''
-
-		while (recv_byte_len < length):
-
-			ChunkSize = int(Serializer.Decode_UTF8(Conn.recv(self.header)).strip())
-			tmp_buffer += Conn.recv(ChunkSize)
-			recv_byte_len += ChunkSize
-
-		self.DumpBytes(fn, tmp_buffer)
-		self.OK(Conn)
-
-	def kill(self): 
-		self.close()
+	def kill(self): self.close()
+	def bind_(self): self.sock.bind((self.ServerHost, self.port))
+	def close(self):
+		self.isOpen = False
+		self.sock.close()
 
 	def ExecuteCommand(self, Client_, c: str) -> None:
 		if c == EXIT:
@@ -88,22 +76,18 @@ class FileServer:
 
 		Client_.disconnect()
 
+	def onProgressCallBack(self, received, remaining, All): 
+		print(f"{ GetSizeInProperUnit(received) } | { GetSizeInProperUnit(remaining) } | { GetSizeInProperUnit(All) }", end="\r")
 	def ProcessClientMessage(self, Message: ClientMessage, Client_) -> None:
 	
 		if Message.Type == FILE:
-			if not Message.Chunked:
-				# self.recvFileBlob(conn, address, length, fn)
-				print("receivig file from ", Client_.Addr)
-				print("File Name: ", Message.fn)
-				print("Length: ", Message.length)
-			
-				self.FileReceiver.SetProperties(Message.fn, Message.length)
-				self.FileReceiver.ReceiveFileBuff(Client_.Conn, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)))
+			self.FileReceiver.SetProperties(Message.fn, Message.length)
 
-			else:
-				# TODO: Make buffreceiver. for chunked data.
-				self.RecvChunks(Client_.Conn, Client_.Addr, Message.length, Message.fn)
+			if not Message.Chunked: 
+				self.FileReceiver.ReceiveFileBuff(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)))
+				return
 			
+			self.FileReceiver.ReceiveFileBuffChunked(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), self.onProgressCallBack)
 			return
 
 		if Message.Type == CMD:
@@ -184,11 +168,3 @@ class FileServer:
 					continue
 
 				break
-				
-	def bind_(self): self.sock.bind((self.ServerHost, self.port))
-	
-	def close(self): 
-		self.isOpen = False
-		print("Closing!")
-		print(self.isOpen)
-		self.sock.close()

@@ -24,3 +24,10 @@ def parseArgs(argv: list[str], argc: int) -> dict:
 				if  next_ <= (argc - 1): mappedArgs[v] = argv[next_]
 
 	return mappedArgs
+
+def Help():
+	print()
+	print("Remote share command line app.")
+	print("USAGE: main.py [-s/-c] -p [default: 4000] --host [default: current Host] -f <filePath> --chunked")
+	print("-f used only by the client to send data.")
+	print("--chunked for breaking down larger files.")

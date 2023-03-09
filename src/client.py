@@ -12,11 +12,13 @@ from Transmission import (
 	CMD
 )
 
+from FileHandler import Chunk
+
 class FileClient:
 	def __init__(self):
 		self.sock: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.port = 4000
-		self.host = "localhost"
+		self.host = socket.gethostbyname(socket.gethostname())
 		self.header = 32
 	
 	def SetHost(self, host):   	 self.host = host
@@ -50,20 +52,20 @@ class FileClient:
 		return Serializer.Encode_UTF8(str(m) + " " * (self.header - len(str(m))))
 
 	def SendFileBytes(self, File_sender):
-		
 		if not File_sender.chunked:
 			File_sender.send(self.sock, (lambda : self.HoldForResult(File_sender)))
 			return
 
+		self.SendFileBuffered(File_sender)
+		self.HoldForResult(File_sender)
+	
 	def close(self):
 		self.sock.close()
 	
 	def SendFile(self, File_sender):
 		c = NewClientMessage(File_sender.FileInformationHeader(self.pwd))
-		
 		self.send(Serializer.SerializeClientMessage(c))
 		self.SendFileBytes(File_sender)
-		
 		return
 
 	def SendCmd(self, command: str):
@@ -80,13 +82,18 @@ class FileClient:
 		self.SendCmd(EXIT)
 		self.HoldForResult()
 
-	def sendFileChunk(self, chunk: bytes, size: int):
-		padding = " " * (self.header - len(str(size)))
-		self.sock.send(Serializer.Encode_UTF8(str(size) + padding))
-		self.sock.send(chunk)
+	def sendFileChunk(self, chunk: Chunk):
+		padding = " " * (self.header - len(str(chunk.size)))
+		
+		EncodedCSize = Serializer.Encode_UTF8(str(chunk.size) + padding)
+		print(f"Sendig chunk: { EncodedCSize }", end="\r")
+		
+		self.sock.send(EncodedCSize)
+		self.sock.send(chunk.content)
 
 	def SendFileBuffered(self, FileBlobObject): 
-		for chunk in FileBlobObject: self.sendFileChunk(chunk.content, chunk.size)
+		self.temp = FileBlobObject
+		FileBlobObject.sendChunks(self.sendFileChunk)
 
 	def HoldForResult(self, sentFile=None):
 		Length_ = Serializer.Decode_UTF8(self.sock.recv(self.header))
