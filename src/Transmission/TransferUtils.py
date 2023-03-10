@@ -53,6 +53,16 @@ class ServerResponse:
 		print("code: ", self.code)
 		print("text: ", self.text)
 
+class ServerClient:
+	def __init__(self, conn, address, port):
+		
+		self.connected: bool = True
+		self.Conn = conn
+		self.Port = port
+		self.Addr = address
+
+	def disconnect(self):
+		self.connected = False
 
 
 class ClientMessage:

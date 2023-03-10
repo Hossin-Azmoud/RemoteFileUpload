@@ -47,19 +47,25 @@ class FileSender:
 	def __init__(self, fn, chunked = False) -> None:
 		
 		self.chunked = chunked
-		self.fileObject = Path(fn)
-		self.fn = self.fileObject.name
-		self.size = stat(self.fileObject).st_size
+		self.PathObject = Path(fn)
+		self.fn = self.PathObject.name
+		self.size = stat(self.PathObject).st_size
 
 	def send(self, sock, callback):
-		sock.send(self.bytes_)
-		callback()
+		with open(self.PathObject, "rb") as fp:
+			sock.send(fp.read())
+			callback()
+
+	def LogInformation(self, Logger):
+		Logger.inform(f"File Name: {self.fn}.")
+		Logger.inform(f"Size: {self.size}.")
+		Logger.inform(f"Abs path: {self.PathObject}.")
 
 	def sendChunks(self, callback: callable):
 
 		read = 0
 		
-		with open(self.fileObject, "rb") as fp: 
+		with open(self.PathObject, "rb") as fp: 
 
 			while read < (self.size - (self.size % CHUNK_SIZE)):				
 				# Read Chunk
@@ -136,10 +142,11 @@ class FileReceiver:
 	
 	def ReceiveFileBuff(self, Client_, output_path, callback):
 		self.Notify(Client_)
+		
 		self.Buffer = Client_.Conn.recv(self.size)
 		
 		if self.Buffer and self.fn:
-			self.DecodeReceivedBuff()
+			# self.DecodeReceivedBuff()
 			self.writeBuff(output_path)
 
 		callback()
@@ -168,4 +175,3 @@ class FileReceiver:
 		delim = "/"
 		out_dir = out_dir.replace("\\", delim)
 		return delim.join([out_dir, self.fn])
-	

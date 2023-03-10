@@ -12,6 +12,7 @@ from FileHandler import FileReceiver
 
 from Transmission import (
 	Serializer,
+	ServerClient,
 	ClientMessage,
 	GetSizeInProperUnit,
 	OKResp,
@@ -23,19 +24,7 @@ from Transmission import (
 	NOT_OK
 )
 
-
-class Client:
-	def __init__(self, conn, address, port):
-		
-		self.connected: bool = True
-		self.Conn = conn
-		self.Port = port
-		self.Addr = address
-
-	def disconnect(self):
-		self.connected = False
-
-class FileServer:	
+class FileProtocolServer:	
 	
 	def __init__(self) -> None:
 		
@@ -56,15 +45,15 @@ class FileServer:
 		self.isOpen = False
 		self.sock.close()
 
-	def ExecuteCommand(self, Client_, c: str) -> None:
+	def ExecuteCommand(self, Client_: ServerClient, c: str) -> None:
 		if c == EXIT:
 			self.sendResult(Client_, OK, "EXIT command executed!")
 			self.kill()
-		else:			
+		else:
 			self.sendResult(Client_, NOT_OK, "Unknown Command!")
 
 
-	def sendResult(self, Client_, Code, Text=None):	
+	def sendResult(self, Client_: ServerClient, Code: int, Text:str=None):	
 		
 		if Code == OK: 
 			self.send( Client_.Conn, OKResp(T=Text) )
@@ -76,9 +65,10 @@ class FileServer:
 
 		Client_.disconnect()
 
-	def onProgressCallBack(self, received, remaining, All): 
+	def onProgressCallBack(self, received: int, remaining: int, All: int): 
 		print(f"{ GetSizeInProperUnit(received) } | { GetSizeInProperUnit(remaining) } | { GetSizeInProperUnit(All) }", end="\r")
-	def ProcessClientMessage(self, Message: ClientMessage, Client_) -> None:
+	
+	def ProcessClientMessage(self, Message: ClientMessage, Client_: ServerClient) -> None:
 	
 		if Message.Type == FILE:
 			self.FileReceiver.SetProperties(Message.fn, Message.length)
@@ -100,7 +90,7 @@ class FileServer:
 		""")
 
 
-	def connect(self, Client_):
+	def connect(self, Client_: ServerClient):
 		
 		while Client_.connected:
 			FileHeaderLength = Serializer.Decode_UTF8(Client_.Conn.recv(self.header))
@@ -126,7 +116,8 @@ class FileServer:
 
 			self.sendResult(Client_, NOT_OK, "Sent empty header!")
 
-	def send(self, Conn, msg):
+	def send(self, Conn, msg: bytes | str) -> None:
+		
 		if not isinstance(msg, bytes):
 			msg = Serializer.Encode_UTF8(msg)
 		
@@ -155,7 +146,7 @@ class FileServer:
 					try:
 						conn, connectInformation = Sock.accept()
 						address, port = connectInformation
-						C = Client(conn, address, port)		
+						C = ServerClient(conn, address, port)		
 						Thread_ = Thread(target=self.connect, args=(C, ))
 						Thread_.start()
 					

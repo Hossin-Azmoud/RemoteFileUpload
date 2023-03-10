@@ -1,8 +1,8 @@
 import socket
 from threading import Thread
 from sys import argv
-from server import FileServer
-from client import FileClient
+from server import FileProtocolServer
+from client import FileProtocolClient
 import datetime
 from random import randint
 # stripping the name of the program.
@@ -24,31 +24,35 @@ from Util import (
 argv = argv[1:]
 argc = len(argv)
 
-def Settings(InstanceClass: FileServer | FileClient, arg: dict):
+def Settings(InstanceClass: FileProtocolServer | FileProtocolClient, arg: dict):
 	if HOST_FLAG in arg:   InstanceClass.SetHost(arg[HOST_FLAG])
 	if PORT_FLAG in arg:   InstanceClass.SetPort(int(arg[PORT_FLAG]))
 	if KEY_FLAG in arg:    InstanceClass.SetPassword(arg[KEY_FLAG])
 
 def FileServerRoute(arg):
-	s = FileServer()
+	""" Listen for file protocol client requests. """
+	s = FileProtocolServer()
 	Settings(s, arg)
 	s.Listen()
 
 def FileClientRoute(arg):
+	""" send requests to file protocol server requests. """
 	
-	c = FileClient()
+	c = FileProtocolClient()
 	check = False
 	Settings(c, arg)
 	c.setPassword()
 	c.connect()
 
 	if FILE_FLAG in arg:
+		# Send fil. arg[FILE_FLAG] is a path to the file.s.
 		fhandle = FileSender(arg[FILE_FLAG], chunked=(CHUNKED_FLAG in argv))
 		c.SendFile(fhandle)
 		check = True
 
 	if CLOSE in argv: 
 		c.SendCloseServerCommand()
+		check = True
 
 	if not check: Help()
 	
