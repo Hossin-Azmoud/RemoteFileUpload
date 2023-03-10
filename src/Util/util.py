@@ -20,8 +20,25 @@ AVAILABLE COLORS FOR THE INTERFACE:
 """
 
 from colorama import Fore as Colors
+from colorama import Back as BColors
 from sys import stdout
 from datetime import datetime
+from Transmission import GetSizeInProperUnit
+
+PROGRESS_BAR_BACKGROUND = BColors.WHITE
+RESET_BACKGROUND = BColors.RESET
+RESET = Colors.RESET
+def progressBar(All, received, prev=0, c=' '):
+	# TODO Implement a general prog bar for client/server or sender/receiver.
+	
+	all__ = 100
+	prev += ((received * all__) / All)
+
+	if prev >= 1:
+		stdout.write(f"{ PROGRESS_BAR_BACKGROUND }{c * (prev // 1)}", end="\r")
+	
+	stdout.write(f"{RESET_BACKGROUND}")
+
 PORT_FLAG = '-p'
 HOST_FLAG = '--host'
 FILE_FLAG = '-f'
@@ -73,7 +90,7 @@ class Logger:
 	def CurrentTime(self): return datetime.now()
 	
 
-	def Log(self, T: str, ctx: str) -> None: stdout.write(f"{ctx} <{self.CurrentTime}> {T}{Colors.RESET}\n")
+	def Log(self, T: str, ctx: str) -> None: stdout.write(f"{ctx} <{self.CurrentTime}> {T}{RESET}\n")
 	
 
 	def error(self, T: str="<err>") -> None: self.Log(T, ERROR)
@@ -88,10 +105,14 @@ class Logger:
 	def logDeletion(self, T: str="<deletion>") -> None: self.Log(T, DELETE)
 		
 
-class progressBar:
+def progressBar(All, Proccessed, c=' '):
 	# TODO Implement a general prog bar for client/server or sender/receiver.
-	pass
+	e = '\r'
+	all__ = 100
+	current = ((Proccessed * all__) / All)
 
+	if current == 100:
+		e = '\n\n'
 
-
-
+	stdout.write(f"{ PROGRESS_BAR_BACKGROUND }{ c * int(current  // 2) } {RESET_BACKGROUND} { current }%/100% | all: { GetSizeInProperUnit(All) }{e}")
+	stdout.write(f"{RESET_BACKGROUND}")

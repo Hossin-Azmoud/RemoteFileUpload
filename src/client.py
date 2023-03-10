@@ -2,7 +2,7 @@ import socket
 from json import dumps, loads
 from base64 import b64encode
 from time import time
-from Util import Logger
+from Util import Logger, progressBar
 
 from Transmission import (
 	Serializer, 
@@ -34,8 +34,8 @@ class FileProtocolClient:
 
 	def connect(self):
 		if self.host:
+			print()
 			self.Logger.inform(f"Connection being established with: { self.host }")
-			
 			self.sock.connect((
 				self.host, self.port
 			))
@@ -43,14 +43,11 @@ class FileProtocolClient:
 	def send(self, msg: bytes):
 
 		MessageLengthAsInt = len(msg)
-		
 		if  len(str(MessageLengthAsInt)) <= self.header:
 			# If the header is enough we send.
-			
 			MessageLengthAsBytes = self.PrepareMessageLengthToTransport(MessageLengthAsInt)
 			self.sock.send(MessageLengthAsBytes)
 			self.sock.send(msg)
-			
 			return
 
 		self.Logger.error("Header is too small for msg!")
@@ -99,19 +96,19 @@ class FileProtocolClient:
 		self.sock.send(chunk.content)
 
 
+
 	def SendFileBuffered(self, File_sender: FileSender): 
 		self.temp = File_sender
-		File_sender.sendChunks(self.sendFileChunk)
+		File_sender.sendChunks(self.sendFileChunk, progressBar)
 
 	def HoldForResult(self, sentFile: FileSender | None=None):
-		Length_ = Serializer.Decode_UTF8(self.sock.recv(self.header))
 		
+		Length_ = Serializer.Decode_UTF8(self.sock.recv(self.header))		
 		if Length_:
 			ParsedLen = int(Length_.strip())
 			if ParsedLen > 0:
 				Resp = Serializer.DeserializeServerReponse(self.sock.recv(ParsedLen))
 				if Resp.code == 200:
-					
 					if sentFile:
 						self.Logger.inform(f"{ sentFile.fn } was sent to { self.host }")
 						return

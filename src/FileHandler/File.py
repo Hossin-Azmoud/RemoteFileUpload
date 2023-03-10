@@ -3,7 +3,8 @@ from json import dumps
 from pathlib import Path
 from dataclasses import dataclass
 from os import stat
-CHUNK_SIZE = 1024 # IN BYTES.
+
+CHUNK_SIZE = (1024 ** 3) # IN BYTES.
 
 class Bounds:
 
@@ -30,10 +31,10 @@ class Bounds:
 
 @dataclass
 class Chunk:
-
+	
 	content: bytes
-	size:    int
-
+	size: int
+	
 	def EncodeB64(self):
 		self.content = b64encode(self.content)
 		self.size = len(self.content)
@@ -41,6 +42,14 @@ class Chunk:
 	def DecodeB64(self):
 		self.content = b64decode(self.content)
 		self.size = len(self.content)
+
+	def Fill(self, data: bytes, size: int):
+		self.content = data
+		self.size = size
+
+	def Free(self):
+		self.content = b''
+		self.size = 0
 
 class FileSender:
 
@@ -61,34 +70,38 @@ class FileSender:
 		Logger.inform(f"Size: {self.size}.")
 		Logger.inform(f"Abs path: {self.PathObject}.")
 
-	def sendChunks(self, callback: callable):
-
+	def sendChunks(self, chunkCapture: callable, progressCallback: callable):
+		print()
 		read = 0
 		
-		with open(self.PathObject, "rb") as fp: 
 
+		with open(self.PathObject, "rb") as fp: 		
 			while read < (self.size - (self.size % CHUNK_SIZE)):				
 				# Read Chunk
 				ChunkBytes = fp.read(CHUNK_SIZE)
 				
 				# encapsulate Chunk
-				chunkObj = Chunk(content=ChunkBytes, size=CHUNK_SIZE)
+				chunkObj = Chunk(ChunkBytes, CHUNK_SIZE)
 				chunkObj.EncodeB64()
-				callback(chunkObj)
-				
+				# Send chunk to the caller
+				chunkCapture(chunkObj)
 				read += CHUNK_SIZE
+				
+				progressCallback(self.size, read)
+				
+
 
 			if (self.size % CHUNK_SIZE) > 0:
 				ChunkBytes = fp.read(self.size % CHUNK_SIZE)
 				
-				chunkObj = Chunk(content=ChunkBytes, size=(self.size % CHUNK_SIZE))
-				chunkObj.EncodeB64()
-				callback(chunkObj)
-				
-			read += self.size % CHUNK_SIZE
-			
-			print("Finished Reading chunks.", self.size, read)
+				chunkObj = Chunk(ChunkBytes, CHUNK_SIZE)
 
+				chunkObj.EncodeB64()
+
+				chunkCapture(chunkObj)
+
+			read += self.size % CHUNK_SIZE
+			progressCallback(self.size, read)
 
 	def FileInformationHeader(self, pwd) -> dict:
 		
@@ -153,21 +166,24 @@ class FileReceiver:
 
 	def ReceiveFileBuffChunked(self, Client_, output_path, callback, onProgress):
 		self.Notify(Client_)
-		received = 0
+		received = 0	
 		onProgress(received, self.size - received, self.size)
 		
 		while (received < self.size):
 
 			ChunkSize_b64 = int(Client_.Conn.recv(32).decode("utf-8").strip())
 			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
-			chunkObj = Chunk(content=RecvChunk_b64, size=ChunkSize_b64)
+	
+			chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64 )
 			chunkObj.DecodeB64()
+
 			received += chunkObj.size
 			self.Buffer += chunkObj.content
 			
 			onProgress(received, self.size - received, self.size)
 
-		if self.Buffer and self.fn: self.writeBuff(output_path)
+		if self.Buffer and self.fn: 
+			self.writeBuff(output_path)
 
 		callback()
 
@@ -175,3 +191,4 @@ class FileReceiver:
 		delim = "/"
 		out_dir = out_dir.replace("\\", delim)
 		return delim.join([out_dir, self.fn])
+
