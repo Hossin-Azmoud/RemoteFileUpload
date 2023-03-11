@@ -172,29 +172,28 @@ class FileReceiver:
 		self.Notify(Client_, Logger)
 		received = 0
 		progressCallback(self.size, received)
-		
-		with open("chunklog.log", "a") as log:
-			while (received < self.size):
-				Size_inBytes = Client_.Conn.recv(HEADER)
-				# Log.
-				log.write(Size_inBytes.decode("utf-8").strip() + "\n")
+			
+		while (received < self.size):
+			Size_inBytes = Client_.Conn.recv(HEADER)
+			# Log.
+			# log.write(Size_inBytes.decode("utf-8").strip() + "\n")
 
-				ChunkSize_b64 = int(Size_inBytes.decode("utf-8").strip())
-				RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
-		
-				chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64)
-							
-				chunkObj.DecodeB64()
-				received += chunkObj.size
-				self.Buffer += chunkObj.content
-				progressCallback(self.size, received)
+			ChunkSize_b64 = int(Size_inBytes.decode("utf-8").strip())
+			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
+	
+			chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64)
+						
+			chunkObj.DecodeB64()
+			received += chunkObj.size
+			self.Buffer += chunkObj.content
+			progressCallback(self.size, received)
 
-			if self.Buffer and self.fn: 
-				Logger.inform("Saving the file :3")
-				self.writeBuff(output_path)
-				Logger.success("saved!")
+		if self.Buffer and self.fn: 
+			Logger.inform("Saving the file :3")
+			self.writeBuff(output_path)
+			Logger.success("saved!")
 
-			callback()
+		callback()
 
 	def make_path(self, out_dir):
 		delim = "/"
