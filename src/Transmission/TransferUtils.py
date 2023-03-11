@@ -39,7 +39,7 @@ def GetSizeInProperUnit(ByteLen: int) -> str:
 	if ByteLen >= UNITMAP['GB']:
 		Unit = 'GB'
 
-	return f'{ ByteLen / UNITMAP[Unit] } { Unit }'
+	return f'{ int(ByteLen // UNITMAP[Unit]) } { Unit }'
 
 @dataclass
 class ServerResponse:
@@ -118,7 +118,12 @@ class Serializer:
 	
 	def SerializeServerReponse(response: ServerResponse) -> bytes: return response.JSON().encode(DEFAULT_ENCODING)
 	def Encode_UTF8(s: str) -> bytes: return s.encode(DEFAULT_ENCODING)
-	def Decode_UTF8(bytes_: bytes) -> str: return bytes_.decode(DEFAULT_ENCODING)
+	def Decode_UTF8(bytes_: bytes) -> str: 
+		r = bytes_.decode(DEFAULT_ENCODING)
+		with open("chunklog.log", "a") as f:
+			print(r, file=f)
+		return r
+		
 
 def DecodeClientMessage(ClientMessage: bytes):
 	if len(ClientMessage) > 0:

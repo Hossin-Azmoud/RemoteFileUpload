@@ -9,6 +9,7 @@ from datetime import datetime
 from os import path
 from Config import RFUConfig
 from FileHandler import FileReceiver
+from Util import Logger, progressBar
 
 from Transmission import (
 	Serializer,
@@ -31,6 +32,7 @@ class FileProtocolServer:
 		self.ConfigInstance 	   =  RFUConfig()
 		self.AuthManager    	   =  ConstructAuthManager(self.ConfigInstance)
 		self.FileReceiver  	   	   =  FileReceiver()
+		self.Logger 			   = Logger()
 		self.port       		   =  4000
 		self.ServerHost 		   =  socket.gethostbyname(socket.gethostname())
 		self.sock       		   =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -65,19 +67,16 @@ class FileProtocolServer:
 
 		Client_.disconnect()
 
-	def onProgressCallBack(self, received: int, remaining: int, All: int): 
-		print(f"{ GetSizeInProperUnit(received) } | { GetSizeInProperUnit(remaining) } | { GetSizeInProperUnit(All) }", end="\r")
-	
 	def ProcessClientMessage(self, Message: ClientMessage, Client_: ServerClient) -> None:
 	
 		if Message.Type == FILE:
 			self.FileReceiver.SetProperties(Message.fn, Message.length)
 
 			if not Message.Chunked: 
-				self.FileReceiver.ReceiveFileBuff(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)))
+				self.FileReceiver.ReceiveFileBuff(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), self.Logger)
 				return
 			
-			self.FileReceiver.ReceiveFileBuffChunked(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), self.onProgressCallBack)
+			self.FileReceiver.ReceiveFileBuffChunked(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), progressBar, self.Logger)
 			return
 
 		if Message.Type == CMD:
@@ -129,7 +128,7 @@ class FileProtocolServer:
 			Conn.send(msg)
 			return
 
-		print("Header is too small for msg!")
+		self.Logger.error("Header is too small to send the message len.")
 
 	def Listen(self):
 		
@@ -137,7 +136,7 @@ class FileProtocolServer:
 		
 		with self.sock as Sock:
 			Sock.listen(10)
-			print(f"Server Started { self.ServerHost }:{ self.port }")
+			self.Logger.inform(f"Server Started { self.ServerHost }:{ self.port }")
 		
 			while True:
 				
@@ -151,10 +150,10 @@ class FileProtocolServer:
 						Thread_.start()
 					
 					except OSError as e:
-						print("CLOSED")
+						self.Logger.inform("Closed server.")
 
 					except Exception as e:
-						print(e)
+						self.Logger.error(e)
 
 					continue
 

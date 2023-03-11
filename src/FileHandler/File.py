@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from os import stat
 
-CHUNK_SIZE = (1024 ** 3) # IN BYTES.
+CHUNK_SIZE = (1024 * 1024 * 4) # IN BYTES.
 
 class Bounds:
 
@@ -29,6 +29,9 @@ class Bounds:
 		return self.__str__()
 
 
+HEADER = 32
+FORMAT = "utf-8"
+
 @dataclass
 class Chunk:
 	
@@ -40,6 +43,10 @@ class Chunk:
 		self.size = len(self.content)
 
 	def DecodeB64(self):
+		
+		missing_padding = len(self.content) % 4		
+		if missing_padding:	self.content += b'=' * (4 - missing_padding)
+
 		self.content = b64decode(self.content)
 		self.size = len(self.content)
 
@@ -50,6 +57,9 @@ class Chunk:
 	def Free(self):
 		self.content = b''
 		self.size = 0
+	def __str__(self):
+		return f'chunk: ... size: {self.size}'
+
 
 class FileSender:
 
@@ -74,30 +84,24 @@ class FileSender:
 		print()
 		read = 0
 		
-
 		with open(self.PathObject, "rb") as fp: 		
-			while read < (self.size - (self.size % CHUNK_SIZE)):				
+			while read < (self.size - (self.size % CHUNK_SIZE)):
 				# Read Chunk
 				ChunkBytes = fp.read(CHUNK_SIZE)
-				
+
 				# encapsulate Chunk
 				chunkObj = Chunk(ChunkBytes, CHUNK_SIZE)
 				chunkObj.EncodeB64()
+				
 				# Send chunk to the caller
 				chunkCapture(chunkObj)
 				read += CHUNK_SIZE
-				
 				progressCallback(self.size, read)
-				
-
 
 			if (self.size % CHUNK_SIZE) > 0:
 				ChunkBytes = fp.read(self.size % CHUNK_SIZE)
-				
-				chunkObj = Chunk(ChunkBytes, CHUNK_SIZE)
-
+				chunkObj = Chunk(ChunkBytes, self.size % CHUNK_SIZE)
 				chunkObj.EncodeB64()
-
 				chunkCapture(chunkObj)
 
 			read += self.size % CHUNK_SIZE
@@ -139,56 +143,60 @@ class FileReceiver:
 		return new
 
 	def writeBuff(self, out_path):
-		
 		with open(self.make_path(out_path), "wb") as fp: 
-			print(f"\n{ self.fn } -> DISC ")
 			fp.write(self.Buffer)
 			self.Buffer = b''
 
 	def DecodeReceivedBuff(self): self.Buffer = b64decode(self.Buffer)
 
-	def Notify(self, Client_):
-		print("Upcoming File write from : ", Client_.Addr)
-		print("File Name : ", self.fn)
-		print("Size : ", self.size)
-
-	
-	def ReceiveFileBuff(self, Client_, output_path, callback):
-		self.Notify(Client_)
+	def Notify(self, Client_, Logger):
+		Logger.inform(f"Upcoming File write from : { Client_.Addr }")
+		Logger.inform(f"File Name : { self.fn }")
+		Logger.inform(f"size : { self.size }")
 		
+
+	def ReceiveFileBuff(self, Client_, output_path, callback, Logger):
+		self.Notify(Client_, Logger)
 		self.Buffer = Client_.Conn.recv(self.size)
 		
 		if self.Buffer and self.fn:
-			# self.DecodeReceivedBuff()
-			self.writeBuff(output_path)
-
-		callback()
-
-	def ReceiveFileBuffChunked(self, Client_, output_path, callback, onProgress):
-		self.Notify(Client_)
-		received = 0	
-		onProgress(received, self.size - received, self.size)
 		
-		while (received < self.size):
-
-			ChunkSize_b64 = int(Client_.Conn.recv(32).decode("utf-8").strip())
-			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
-	
-			chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64 )
-			chunkObj.DecodeB64()
-
-			received += chunkObj.size
-			self.Buffer += chunkObj.content
-			
-			onProgress(received, self.size - received, self.size)
-
-		if self.Buffer and self.fn: 
+			Logger.inform("Saving the file :3")
 			self.writeBuff(output_path)
+			Logger.success("saved!")
 
 		callback()
+
+	def ReceiveFileBuffChunked(self, Client_, output_path, callback, progressCallback, Logger):
+		
+		self.Notify(Client_, Logger)
+		received = 0
+		progressCallback(self.size, received)
+		
+		with open("chunklog.log", "a") as log:
+			while (received < self.size):
+				Size_inBytes = Client_.Conn.recv(HEADER)
+				# Log.
+				log.write(Size_inBytes.decode("utf-8").strip() + "\n")
+
+				ChunkSize_b64 = int(Size_inBytes.decode("utf-8").strip())
+				RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
+		
+				chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64)
+							
+				chunkObj.DecodeB64()
+				received += chunkObj.size
+				self.Buffer += chunkObj.content
+				progressCallback(self.size, received)
+
+			if self.Buffer and self.fn: 
+				Logger.inform("Saving the file :3")
+				self.writeBuff(output_path)
+				Logger.success("saved!")
+
+			callback()
 
 	def make_path(self, out_dir):
 		delim = "/"
 		out_dir = out_dir.replace("\\", delim)
 		return delim.join([out_dir, self.fn])
-

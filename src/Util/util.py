@@ -25,19 +25,9 @@ from sys import stdout
 from datetime import datetime
 from Transmission import GetSizeInProperUnit
 
-PROGRESS_BAR_BACKGROUND = BColors.WHITE
+PROGRESS_BAR_BACKGROUND = BColors.YELLOW
 RESET_BACKGROUND = BColors.RESET
 RESET = Colors.RESET
-def progressBar(All, received, prev=0, c=' '):
-	# TODO Implement a general prog bar for client/server or sender/receiver.
-	
-	all__ = 100
-	prev += ((received * all__) / All)
-
-	if prev >= 1:
-		stdout.write(f"{ PROGRESS_BAR_BACKGROUND }{c * (prev // 1)}", end="\r")
-	
-	stdout.write(f"{RESET_BACKGROUND}")
 
 PORT_FLAG = '-p'
 HOST_FLAG = '--host'
@@ -52,10 +42,10 @@ CLIENT: str = "-c"
 
 DEFAULT_TEXT_COLOR = Colors.LIGHTYELLOW_EX
 
-INFO 	= f"{Colors.BLUE}[+] {DEFAULT_TEXT_COLOR}"
-ERROR 	= f"{Colors.RED}[!] {DEFAULT_TEXT_COLOR}"
-SUCCESS = f"{Colors.GREEN}[*] {DEFAULT_TEXT_COLOR}"
-DELETE 	= f"{Colors.YELLOW}[-] {DEFAULT_TEXT_COLOR}"
+INFO 	= f"{Colors.LIGHTYELLOW_EX}[+] "
+ERROR 	= f"{Colors.RED}[!] "
+SUCCESS = f"{Colors.GREEN}[*] "
+DELETE 	= f"{Colors.YELLOW}[-] "
 
 __FLAGS = [PORT_FLAG, HOST_FLAG, FILE_FLAG, CHUNKED_FLAG, KEY_FLAG]
 
@@ -89,18 +79,13 @@ class Logger:
 	@property
 	def CurrentTime(self): return datetime.now()
 	
-
 	def Log(self, T: str, ctx: str) -> None: stdout.write(f"{ctx} <{self.CurrentTime}> {T}{RESET}\n")
 	
-
 	def error(self, T: str="<err>") -> None: self.Log(T, ERROR)
 	
-
 	def success(self, T: str="<success>") -> None:  self.Log(T, SUCCESS)
 	
-
 	def inform(self, T: str="<info>") -> None: self.Log(T, INFO)
-	
 
 	def logDeletion(self, T: str="<deletion>") -> None: self.Log(T, DELETE)
 		
@@ -111,8 +96,7 @@ def progressBar(All, Proccessed, c=' '):
 	all__ = 100
 	current = ((Proccessed * all__) / All)
 
-	if current == 100:
-		e = '\n\n'
+	if int(current//1) == 100: e = '\n\n'
 
-	stdout.write(f"{ PROGRESS_BAR_BACKGROUND }{ c * int(current  // 2) } {RESET_BACKGROUND} { current }%/100% | all: { GetSizeInProperUnit(All) }{e}")
-	stdout.write(f"{RESET_BACKGROUND}")
+	stdout.write(f"{ PROGRESS_BAR_BACKGROUND }{ c * int(current  // 2) } {RESET_BACKGROUND} { int(current//1) }%/100% | all: { GetSizeInProperUnit(int( All//1 )) }{e}")
+	stdout.write(f"{ RESET_BACKGROUND }")

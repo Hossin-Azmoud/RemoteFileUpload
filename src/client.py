@@ -91,9 +91,15 @@ class FileProtocolClient:
 	def sendFileChunk(self, chunk: Chunk):
 		# Implement a progress bar.
 		padding = " " * (self.header - len(str(chunk.size)))
+		
 		EncodedCSize = Serializer.Encode_UTF8(str(chunk.size) + padding)
-		self.sock.send(EncodedCSize)
-		self.sock.send(chunk.content)
+		try:
+			l = int(EncodedCSize.decode("utf-8").strip())
+		except:
+			print(chunk)
+
+		self.sock.sendall(EncodedCSize)
+		self.sock.sendall(chunk.content)
 
 
 
@@ -110,10 +116,10 @@ class FileProtocolClient:
 				Resp = Serializer.DeserializeServerReponse(self.sock.recv(ParsedLen))
 				if Resp.code == 200:
 					if sentFile:
-						self.Logger.inform(f"{ sentFile.fn } was sent to { self.host }")
+						self.Logger.success(f"{ sentFile.fn } was sent to { self.host }")
 						return
 
 					self.Logger.inform()
 					return
-				
+
 				self.Logger.error(f"{ sentFile.fn } was not sent successfully.")
