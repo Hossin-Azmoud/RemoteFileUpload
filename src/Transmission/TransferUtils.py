@@ -117,11 +117,16 @@ class Serializer:
 		)
 	
 	def SerializeServerReponse(response: ServerResponse) -> bytes: return response.JSON().encode(DEFAULT_ENCODING)
+	
 	def Encode_UTF8(s: str) -> bytes: return s.encode(DEFAULT_ENCODING)
+	
 	def Decode_UTF8(bytes_: bytes) -> str: 
+
 		r = bytes_.decode(DEFAULT_ENCODING)
+		
 		with open("chunklog.log", "a") as f:
 			print(r, file=f)
+		
 		return r
 		
 

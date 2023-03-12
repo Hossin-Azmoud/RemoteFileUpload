@@ -31,6 +31,7 @@ def Settings(InstanceClass: FileProtocolServer | FileProtocolClient, arg: dict):
 
 def FileServerRoute(arg):
 	""" Listen for file protocol client requests. """
+	
 	s = FileProtocolServer()
 	Settings(s, arg)
 	s.Listen()
@@ -68,9 +69,9 @@ def main():
 	arguments = parseArgs(argv[1:], argc - 1)
 
 	if argc > 0:
-		if argv[0] in routes: 
+		if argv[0] in routes:
 			routes[argv[0]](arguments)
-	else:		
+	else:
 		Help()
 
 if __name__ == '__main__': main()

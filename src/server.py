@@ -32,11 +32,11 @@ class FileProtocolServer:
 		self.ConfigInstance 	   =  RFUConfig()
 		self.AuthManager    	   =  ConstructAuthManager(self.ConfigInstance)
 		self.FileReceiver  	   	   =  FileReceiver()
-		self.Logger 			   = Logger()
+		self.Logger 			   =  Logger()
 		self.port       		   =  4000
 		self.ServerHost 		   =  socket.gethostbyname(socket.gethostname())
 		self.sock       		   =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.header     		   =  32
+		self.header     		   =  16
 		self.isOpen                =  True
 	
 	def SetHost(self, host):  self.ServerHost = host
@@ -107,9 +107,9 @@ class FileProtocolServer:
 						continue
 
 					self.sendResult(Client_, NOT_OK, "Wrong password!")
-					continue
+					break
 
-					self.sendResult(Client_, NOT_OK, "Empty dataFrame!")
+				self.sendResult(Client_, NOT_OK, "Empty dataFrame!")
 
 				continue
 

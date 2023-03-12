@@ -4,7 +4,14 @@ from pathlib import Path
 from dataclasses import dataclass
 from os import stat
 
+OK = 200
+PARSE_ERROR = 501
+NOT_OK = 404
+
+HEADER = 16
+FORMAT = "utf-8"
 CHUNK_SIZE = (1024 * 1024 * 4) # IN BYTES.
+
 
 class Bounds:
 
@@ -29,8 +36,6 @@ class Bounds:
 		return self.__str__()
 
 
-HEADER = 32
-FORMAT = "utf-8"
 
 @dataclass
 class Chunk:
@@ -57,6 +62,7 @@ class Chunk:
 	def Free(self):
 		self.content = b''
 		self.size = 0
+
 	def __str__(self):
 		return f'chunk: ... size: {self.size}'
 
@@ -169,23 +175,40 @@ class FileReceiver:
 
 	def ReceiveFileBuffChunked(self, Client_, output_path, callback, progressCallback, Logger):
 		
+
 		self.Notify(Client_, Logger)
 		received = 0
 		progressCallback(self.size, received)
-			
+		result = (lambda c : Client_.Conn.send(str(c).encode(FORMAT)))
+		
 		while (received < self.size):
-			Size_inBytes = Client_.Conn.recv(HEADER)
-			# Log.
-			# log.write(Size_inBytes.decode("utf-8").strip() + "\n")
 
-			ChunkSize_b64 = int(Size_inBytes.decode("utf-8").strip())
+			try:
+				
+				Size_inBytes = Client_.Conn.recv(HEADER)
+				ChunkSize_b64 = int(Size_inBytes.decode("utf-8").strip())
+
+			except ValueError:
+				# resend Chunk.
+				Logger.error("Incorrect size: " + Size_inBytes.decode('utf-8'))
+				result(PARSE_ERROR)
+				continue
+			
+			except Exception as e:
+				# resend Chunk.
+				Logger.inform("Error while receiving the size of the chunk.")
+				Logger.error(e)
+				result(NOT_OK)
+				continue
+			
+			result(OK)
 			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
-	
 			chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64)
-						
 			chunkObj.DecodeB64()
 			received += chunkObj.size
 			self.Buffer += chunkObj.content
+			# Next Chunk.
+			
 			progressCallback(self.size, received)
 
 		if self.Buffer and self.fn: 

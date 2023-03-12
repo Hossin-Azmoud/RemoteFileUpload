@@ -10,18 +10,21 @@ from Transmission import (
 	NewClientMessage, 
 	EXIT,
 	FILE,
-	CMD
+	CMD,
+	OK
 )
 
 from FileHandler import Chunk, FileSender
 
 class FileProtocolClient:
 	def __init__(self):
+		
 		self.sock: socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.port = 4000
 		self.host = socket.gethostbyname(socket.gethostname())
-		self.header = 32
+		self.header = 16
 		self.Logger = Logger()
+		self.sizes = []
 
 	def SetHost(self, host: str):   	 
 		self.host = host
@@ -34,7 +37,9 @@ class FileProtocolClient:
 
 	def connect(self):
 		if self.host:
+			
 			print()
+			
 			self.Logger.inform(f"Connection being established with: { self.host }")
 			self.sock.connect((
 				self.host, self.port
@@ -90,22 +95,40 @@ class FileProtocolClient:
 
 	def sendFileChunk(self, chunk: Chunk):
 		# Implement a progress bar.
-		padding = " " * (self.header - len(str(chunk.size)))
-		
-		EncodedCSize = Serializer.Encode_UTF8(str(chunk.size) + padding)
-		try:
-			l = int(EncodedCSize.decode("utf-8").strip())
-		except:
-			print(chunk)
+		if  len(str(chunk.size)) <= self.header:
+			
+			# If the header is enough we send.
+			# TODO: System for failure, send atleast 4 time until it got it right!
+			ok_ = False
+			
+			while not ok_:
 
-		self.sock.sendall(EncodedCSize)
-		self.sock.sendall(chunk.content)
+				SizeOfChunk = self.PrepareMessageLengthToTransport(chunk.size)
+				
+				self.sock.sendall(SizeOfChunk)
+				result = Serializer.Decode_UTF8(self.sock.recv(3))
+				
+				if int(result) == OK: 
+					self.sock.sendall(chunk.content)
+					ok_ = True
+				else:
+					self.Logger.inform(f"Could not send the chunk with this size: {SizeOfChunk}")
+			return
+
+		self.Logger.error("Header is too small for msg!")
 
 
+	def checkChunk(self, chunk: Chunk): 
+	
+		SizeOfChunk = self.PrepareMessageLengthToTransport(chunk.size)
+		self.sizes.append(SizeOfChunk)
 
 	def SendFileBuffered(self, File_sender: FileSender): 
-		self.temp = File_sender
+		
 		File_sender.sendChunks(self.sendFileChunk, progressBar)
+		
+		if len(self.sizes) > 0: 
+			for i in self.sizes: print(i.ljust(2))
 
 	def HoldForResult(self, sentFile: FileSender | None=None):
 		
