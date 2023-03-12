@@ -37,11 +37,12 @@ class Bounds:
 
 
 
-@dataclass
+
 class Chunk:
 	
-	content: bytes
-	size: int
+	def __init__(self, content: bytes, size: int):
+		self.content = content
+		self.size = size
 	
 	def EncodeB64(self):
 		self.content = b64encode(self.content)
@@ -50,7 +51,9 @@ class Chunk:
 	def DecodeB64(self):
 		
 		missing_padding = len(self.content) % 4		
-		if missing_padding:	self.content += b'=' * (4 - missing_padding)
+		
+		if missing_padding:	
+			self.content += b'=' * (4 - missing_padding)
 
 		self.content = b64decode(self.content)
 		self.size = len(self.content)
@@ -87,10 +90,12 @@ class FileSender:
 		Logger.inform(f"Abs path: {self.PathObject}.")
 
 	def sendChunks(self, chunkCapture: callable, progressCallback: callable):
+		
 		print()
 		read = 0
 		
 		with open(self.PathObject, "rb") as fp: 		
+			
 			while read < (self.size - (self.size % CHUNK_SIZE)):
 				# Read Chunk
 				ChunkBytes = fp.read(CHUNK_SIZE)
@@ -100,17 +105,22 @@ class FileSender:
 				chunkObj.EncodeB64()
 				
 				# Send chunk to the caller
-				chunkCapture(chunkObj)
+				chunkCapture(chunkObj.content, chunkObj.size)
+				
 				read += CHUNK_SIZE
+				
 				progressCallback(self.size, read)
 
 			if (self.size % CHUNK_SIZE) > 0:
 				ChunkBytes = fp.read(self.size % CHUNK_SIZE)
+				
 				chunkObj = Chunk(ChunkBytes, self.size % CHUNK_SIZE)
 				chunkObj.EncodeB64()
-				chunkCapture(chunkObj)
+
+				chunkCapture(chunkObj.content, chunkObj.size)
 
 			read += self.size % CHUNK_SIZE
+			
 			progressCallback(self.size, read)
 
 	def FileInformationHeader(self, pwd) -> dict:
@@ -202,9 +212,18 @@ class FileReceiver:
 				continue
 			
 			result(OK)
-			RecvChunk_b64 = Client_.Conn.recv(ChunkSize_b64)
+
+			n = ChunkSize_b64
+			buff = b''
+			
+			while (n > ChunkSize_b64):
+				buff = Client_.Conn.recv(n)
+				RecvChunk_b64 += buff
+				n -= len(buff)
+
 			chunkObj = Chunk(RecvChunk_b64, ChunkSize_b64)
 			chunkObj.DecodeB64()
+			
 			received += chunkObj.size
 			self.Buffer += chunkObj.content
 			# Next Chunk.

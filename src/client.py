@@ -93,26 +93,34 @@ class FileProtocolClient:
 		self.SendCmd(EXIT)
 		self.HoldForResult()
 
-	def sendFileChunk(self, chunk: Chunk):
+	def sendFileChunk(self, chunk: bytes, size: int):
 		# Implement a progress bar.
-		if  len(str(chunk.size)) <= self.header:
-			
+		
+		if  len(str(size)) <= self.header:
 			# If the header is enough we send.
 			# TODO: System for failure, send atleast 4 time until it got it right!
-			ok_ = False
 			
+			ok_ = False
 			while not ok_:
 
-				SizeOfChunk = self.PrepareMessageLengthToTransport(chunk.size)
+				SizeOfChunk = self.PrepareMessageLengthToTransport(size)
 				
-				self.sock.sendall(SizeOfChunk)
+				self.sock.send(SizeOfChunk)
+				
 				result = Serializer.Decode_UTF8(self.sock.recv(3))
-				
-				if int(result) == OK: 
-					self.sock.sendall(chunk.content)
+
+				if int(result) == OK:
+					
+					n = 0
+					
+					while n == 0 or n < size:
+						n += self.sock.send(chunk[n:])
+
 					ok_ = True
-				else:
-					self.Logger.inform(f"Could not send the chunk with this size: {SizeOfChunk}")
+					continue
+
+				self.Logger.inform(f"Could not send the chunk with this size: { SizeOfChunk }")
+					
 			return
 
 		self.Logger.error("Header is too small for msg!")
