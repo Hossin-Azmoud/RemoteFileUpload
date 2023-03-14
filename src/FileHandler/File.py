@@ -229,7 +229,7 @@ class FileReceiver:
                 # write the chunk.
                 fp.write(chunkObj.content)
 
-                received += header.size
+                received += CHUNK_SIZE
                 header.amount -= 1
 
                 # Next Chunk.
@@ -245,7 +245,7 @@ class FileReceiver:
                 # write the chunk.
                 fp.write(chunkObj.content)
 
-                received += header.rem
+                received += self.size % CHUNK_SIZE
                 # Next Chunk.
                 result(OK)
             
