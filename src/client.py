@@ -3,7 +3,6 @@ from json import dumps, loads
 from base64 import b64encode
 from time import time
 from Util import Logger, progressBar
-
 from Transmission import (
     Serializer, 
     ClientMessage, 
@@ -17,8 +16,6 @@ from Transmission import (
 
 from FileHandler import Chunk, FileSender
 
-
-
 class FileProtocolClient:
 
     def __init__(self):
@@ -28,9 +25,13 @@ class FileProtocolClient:
         self.header = 16
         self.Logger = Logger()
         self.sizes = []
+        self.Timed = True
 
     def SetHost(self, host: str):        
         self.host = host
+    
+    def SetTimer(self):
+        self.Timed = True
 
     def SetPort(self, NewPort: int):     
         self.port = NewPort
@@ -66,13 +67,20 @@ class FileProtocolClient:
     def SendFileBytes(self, File_sender: FileSender):
         
         File_sender.LogInformation(self.Logger)
+        start = time()
+
         if not File_sender.chunked:     
             File_sender.send(self.sock, (lambda : self.HoldForResult(File_sender)))
+            
+            if self.Timed: 
+                self.Logger.inform(f"sent in: { time() - start } s")
+
             return
 
         self.Logger.inform(f"sending file using chunked protocol")
         self.SendFileBuffered(File_sender)
-        self.HoldForResult(File_sender)
+        self.HoldForResult(File_sender)     
+        if self.Timed: self.Logger.inform(f"sent in: { time() - start } s")
     
     def close(self): self.sock.close()
     
@@ -100,13 +108,12 @@ class FileProtocolClient:
         self.SendCmd(EXIT)
         self.HoldForResult()
 
-    def sendFileChunk(self, chunk: Chunk):
-        ok_ = False
+    def sendFileChunk(self, chunk: bytes):
         
+        ok_ = False
         while not ok_:
-            self.sock.send(chunk.content)
-            result = Serializer.Decode_UTF8(self.sock.recv(3))
-            
+            self.sock.send(chunk)
+            result = Serializer.Decode_UTF8(self.sock.recv(3)) 
             if int(result) == OK:
                 ok_ = True
                 break
@@ -118,12 +125,6 @@ class FileProtocolClient:
 
     def SendFileBuffered(self, File_sender: FileSender): 
         # Update: Before start sending, we need to send a HEADER to indicate the size and amount of chunks, and also the size of the remaining chunk.
-
-        Header = File_sender.GetFileHeader()
-
-        # send the info about the file.
-        self.sendHeader(Header) 
-        # send all the chunks.
         File_sender.sendChunks(self.sendFileChunk, progressBar)
          
     def HoldForResult(self, sentFile: FileSender | None=None):

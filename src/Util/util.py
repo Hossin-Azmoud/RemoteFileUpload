@@ -36,6 +36,7 @@ CHUNKED_FLAG = '--progress'
 KEY_FLAG = '--key'
 RESET_FLAG = '--reset'
 CLOSE = '--shutdown'
+TIMER_FLAG = '--time'
 
 SERVER: str = "-s"
 CLIENT: str = "-c"

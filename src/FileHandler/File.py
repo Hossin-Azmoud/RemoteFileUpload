@@ -14,32 +14,6 @@ CHUNK_SIZE = (1024 * 1024 * 4) # IN BYTES.
 def GetChunkSizeAfterEncoded(chunk: bytes) -> int: 
     return len(b64encode(chunk))
 
-
-
-class Bounds:
-
-    def __init__(self, Tail: int=0, Head: int=1):
-        self.Tail = Tail
-        self.Head = Head
-
-    @property
-    def size_in_between(self): return abs(self.Head - self.Tail)
-
-    def __add__(self, other):
-        
-        if isinstance(other, int):
-        
-            self.Head = self.Head + other
-            self.Tail = self.Tail + other
-        
-        return self
-
-    def __str__(self): return f'Bounds(Tail: {self.Tail}, Head: {self.Head})'
-    def __repr__(self): return self.__str__()
-
-
-
-
 class Chunk:
     
     def __init__(self, content: bytes):
@@ -115,38 +89,28 @@ class FileSender:
 
     def sendChunks(self, chunkCapture: callable, progressCallback: callable):
         print()
-
         read = 0
         rem = (self.size % CHUNK_SIZE)
+        
         progressCallback(self.size, read)
-  
+        
         with open(self.PathObject, "rb") as fp:         
             # Send all chunks.
             while read < self.size - rem:
                 chunk = fp.read(CHUNK_SIZE)
-                # prepare the chunk.
-                chunkObject = Chunk(chunk)
-                chunkObject.EncodeB64()
-  
                 # send back to the caller.
-                chunkCapture(chunkObject)
-     
+                chunkCapture(chunk)
                 read += CHUNK_SIZE
                 #display progress.
                 progressCallback(self.size, read)
     
-            if rem > 0:    
+            if rem > 0:
                 chunk = fp.read(rem)
-                 
-                chunkObject = Chunk(chunk)
-                chunkObject.EncodeB64()
-                chunkCapture(chunkObject)
-
-                read += rem
-            
+                chunkCapture(chunk)
+                read += rem        
             #display progress.
             progressCallback(self.size, read)
-    
+
     def FileInformationHeader(self, pwd) -> dict:
         if self.chunked:
             return {
@@ -207,9 +171,10 @@ class FileReceiver:
 
         callback()
 
-    def ReceiveFileBuffChunked(self, Client_, output_path, callback, progressCallback, Logger, header):
+    def ReceiveFileBuffChunked(self, Client_, output_path, callback, progressCallback, Logger):
 
         self.Notify(Client_, Logger)
+        
         received = 0       
         progressCallback(self.size, received)
         
@@ -218,37 +183,29 @@ class FileReceiver:
         )
         
         o = self.make_path(output_path) 
+        rem = self.size % CHUNK_SIZE
+
         progressCallback(self.size, received)
-
+        
         with open(o, 'wb') as fp:    
-            while header.amount > 0:
-                chunk = Client_.Conn.recv(int(header.size)) 
-                chunkObj = Chunk(chunk)
-                chunkObj.DecodeB64()
-                
+            while received < self.size - rem:
+                chunk = Client_.Conn.recv(CHUNK_SIZE)
                 # write the chunk.
-                fp.write(chunkObj.content)
-
+                fp.write(chunk)
                 received += CHUNK_SIZE
-                header.amount -= 1
 
                 # Next Chunk.
                 result(OK)
                 progressCallback(self.size, received)
     
-            if header.rem:
-                chunk = Client_.Conn.recv(int(header.rem))
-               
-                chunkObj = Chunk(chunk)
-                chunkObj.DecodeB64()
-                
+            if rem:
+                chunk = Client_.Conn.recv(rem)
                 # write the chunk.
-                fp.write(chunkObj.content)
-
+                fp.write(chunk)
                 received += self.size % CHUNK_SIZE
                 # Next Chunk.
                 result(OK)
-            
+
             progressCallback(self.size, received)
 
             
@@ -262,3 +219,6 @@ class FileReceiver:
         delim = "/"
         out_dir = out_dir.replace("\\", delim)
         return delim.join([out_dir, self.fn])
+
+
+

@@ -1,0 +1,26 @@
+# command:
+
+main.py -c -d "./Videos" --progress
+
+# we will send the directory header:
+    ./Videos
+{
+    'Name': 'Videos'
+    'tree': [
+	'files': [ ARRAY OF FILES IN THE directory],
+	'directories': [
+	    ARRAY OF THE directories
+	]
+    ]
+}
+
+# After the server gets the header it will iterate over the tree this way.
+
+first mkdir header['Name']
+
+for file in header['tree']['files']:
+    recv and write to disk.
+
+for directorie in header['tree']['files']:
+    mkdir directorie
+

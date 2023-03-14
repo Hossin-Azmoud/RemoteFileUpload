@@ -1,4 +1,5 @@
 import socket
+from time import time 
 from threading import Thread, active_count
 from dataclasses import dataclass, field
 from json import dumps, loads
@@ -37,7 +38,8 @@ class FileProtocolServer:
         self.sock                  =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.header                =  16
         self.isOpen                =  True
-    
+        self.Timed                 = True
+
     def SetHost(self, host):  self.ServerHost = host
     def SetPort(self, NewPort): self.port = NewPort
     def kill(self): self.close()
@@ -65,22 +67,26 @@ class FileProtocolServer:
             self.send( Client_.Conn, NewServerResponse(T=Text, C=Code) )
 
         Client_.disconnect()
+    
+    def SetTimer(self) -> None: self.Timed = True
 
     def ProcessClientMessage(self, Message: ClientMessage, Client_: ServerClient) -> None:
-    
+         
         if Message.Type == FILE:
-
             self.FileReceiver.SetProperties(Message.fn, Message.length)
+            start = time()
             if not Message.Chunked: 
+
                 self.FileReceiver.ReceiveFileBuff(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), self.Logger)
+
+                if self.Timed:
+                    self.Logger.inform(f"received in: {time() - start} s")
+
                 return
             
-            # get the header.
-            HeaderLength = int(Serializer.Decode_UTF8(Client_.Conn.recv(self.header)).strip())
-            Header = Serializer.DeserializeClientMessage(Client_.Conn.recv(HeaderLength))
-            Header.UnPackMessageData()
-              
-            self.FileReceiver.ReceiveFileBuffChunked(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), progressBar, self.Logger, Header)
+            self.FileReceiver.ReceiveFileBuffChunked(Client_, self.ConfigInstance.SavePath, (lambda : self.sendResult(Client_, OK)), progressBar, self.Logger)
+            if self.Timed:
+                self.Logger.inform(f"received in: {time() - start} s")
             return
 
         if Message.Type == CMD:
